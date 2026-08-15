@@ -973,7 +973,7 @@ install = []
 
 # These two USERMODs are part of the normal/fresh RAKF installation, but the
 # old TRKF126 installation already has them.  Do not RECEIVE/APPLY them again
-# during an upgrade; among other things, ZJW0004's PRE(ZJW0003) is already
+# during an upgrade; among other things, ZPY0001's PRE(ZJW0003) is already
 # satisfied by the existing ZJW0003.
 if not args.upgrade:
     install.extend([
@@ -982,14 +982,14 @@ if not args.upgrade:
     ])
 
 install.extend([
-    # ZJW0004 MACUPDs SGIEE0MS to add the //RAKFSHAD DD to MSTJCL00, which is
+    # ZPY0001 MACUPDs SGIEE0MS to add the //RAKFSHAD DD to MSTJCL00, which is
     # how RAKFUSER reaches SYS1.SECURE.SHADOW at IPL. It declares
     # PRE(ZJW0003): fresh install emits ZJW0003 above; --upgrade relies on the
     # ZJW0003 already installed with the previous RAKF release.
     # Without it the OPEN fails with 'IEC130I RAKFSHAD DD STATEMENT MISSING',
     # no hashes load, and -- since build_credentials() blanks the USERS
     # password column -- every credential on the system becomes unverifiable.
-    'USERMODS/ZJW0004.jcl',
+    'USERMODS/ZPY0001.jcl',
     'TOOLS/RAKFCUST.jcl',
     'AUX/VTOC/vtoc.jcl',
     'AUX/CDSCB.jcl',

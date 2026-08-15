@@ -932,7 +932,7 @@ changed.
   the userid, an 8-byte salt and the digest. Protected by the existing
   `SYS1.SECURE.*` profile at `UACC(NONE)`.
 - `RAKFUSER` loads the shadow into the in-core table at IPL through the new
-  `RAKFSHAD` DD, added to `MSTJCL00` by usermod `ZJW0004`.
+  `RAKFSHAD` DD, added to `MSTJCL00` by usermod `ZPY0001`.
 - New `ADDUSER` and `ALTUSER` command processors, installed into
   `SYS2.CMDLIB`, with TSO HELP members in `SYS2.HELP`. They locate the
   control datasets by reading the `RAKFUSER` procedure and allocate them
