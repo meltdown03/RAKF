@@ -879,7 +879,6 @@ def emit_tools():
         recv.format(cmdlib=args.cmdlib, vol=args.volume))
     (emit_guarded_text if args.upgrade else emit_text)(
         TOOLS_INSTALL.format(cmdlib=args.cmdlib))
-    emit_help()
 
 
 # ------------------------------------------------------------------ #
@@ -909,7 +908,7 @@ def emit_shadow_recovery(shadow):
     """
     dsn = args.shadow_dsn.upper()
     emit("//RAKFSHAD JOB (RAKF),'RAKF SHADOW RECOVERY',CLASS=A,MSGCLASS=A,")
-    emit("//             MSGLEVEL=(1,1),REGION=4096K")
+    emit("//            MSGLEVEL=(1,1),REGION=4096K,USER=IBMUSER,PASS=SYS1")
     emit("//* Recreate the RAKF V2 password shadow file")
     emit("//DELETE   EXEC PGM=IDCAMS")
     emit("//SYSPRINT DD SYSOUT=*")
@@ -1031,6 +1030,7 @@ for jcl in install:
         emit_shadow_load(shadow_bytes)
         if not args.no_tools:
             emit_tools()
+        emit_help()
     elif 'VTOCSRAC' in jcl:
         emit_vtocsrac(path, guard_apply=args.upgrade)
     else:

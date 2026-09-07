@@ -108,6 +108,9 @@ MODULES = [
                        "ICHRIN00", "SYS1.LPALIB",  "MAP,LIST,NCAL,LET,RENT,REFR,REUS,AC=1",
                        aliases=["IGC0013{", "IGC0013A", "IGC0013B", "IGC0013C"]),
     Module("RACIND",   ["RACIND"],                         ["ASMIND"],              "RACIND",   "SYS1.LINKLIB", "MAP,LIST,LET,NCAL,AC=1"),
+    Module("ADDUSER",  ["ADDUSER", "RAKFPWH", "RAKFHASH"], ["ASMADD", "ASMPWHA", "ASMHASHA"], "ADDUSER", "SYS2.CMDLIB", "MAP,LIST,LET,NCAL,AC=1"),
+    Module("ALTUSER",  ["ALTUSER", "RAKFPWH", "RAKFHASH"], ["ASMALT", "ASMPWHB", "ASMHASHB"], "ALTUSER", "SYS2.CMDLIB", "MAP,LIST,LET,NCAL,AC=1"),
+    Module("DELUSER",  ["DELUSER"],                        ["ASMDEL"],              "DELUSER",  "SYS2.CMDLIB",  "MAP,LIST,LET,NCAL,AC=1"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -405,6 +408,7 @@ def build_steps(modules: list, hlq: str) -> list:
     all_steps: list[list] = []
     obj_syspunch_indices: list[tuple[int, int]] = []  # (step_idx, line_idx)
     obj_created = False
+    assembled_sources = set()
 
     for mod in modules:
         out += [
@@ -415,6 +419,9 @@ def build_steps(modules: list, hlq: str) -> list:
 
         # --- Assembly step(s) ---
         for src, step_name in zip(mod.sources, mod.asm_steps):
+            if src in assembled_sources:
+                continue
+
             if obj_created:
                 obj_disp = f"DISP=(OLD,PASS),DSN=&&OBJ({src}),UNIT=SYSALLDA"
             else:
@@ -436,6 +443,7 @@ def build_steps(modules: list, hlq: str) -> list:
             syspunch_idx = 5   # index of the SYSPUNCH line within `step`
             obj_syspunch_indices.append((len(all_steps), syspunch_idx))
             all_steps.append(step)
+            assembled_sources.add(src)
 
         # --- Link step ---
         link_step = [

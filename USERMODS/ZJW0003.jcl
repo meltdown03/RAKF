@@ -6,8 +6,8 @@
 /*JOBPARM LINES=100
 //ZJW00031 EXEC SMPREC
 //SMPPTFIN DD  *
-++USERMOD (ZJW0003).
-++VER (Z038) FMID(EBB1102).
+++USERMOD (ZJW0003) REWORK(20260828).
+++VER (Z038) FMID(EBB1102) SUP(ZUM0005).
 ++MACUPD(SGIEE0MS).
 ./ CHANGE NAME=SGIEE0MS
          DC    CL80'//RAKFPROF DD DSN=SYS1.SECURE.CNTL(PROFILES),'      04870010
@@ -16,6 +16,9 @@
          DC    CL80'//            DISP=SHR'                             04870013
          DC    CL80'//RAKFPWUP DD DSN=SYS1.SECURE.PWUP,'                04870014
          DC    CL80'//            DISP=SHR'                             04870015
+         DC    CL80'//RAKFSHAD DD DSN=SYS1.SECURE.SHADOW,'              04870016
+         DC    CL80'//            DISP=SHR'                             04870017
+         DC    CL80'//*START &SSNAME'                                   04900002
 /*
 //SMPCNTL  DD  *
  /* REJECT  SELECT(ZJW0003). */

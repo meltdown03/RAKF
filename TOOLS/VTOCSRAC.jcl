@@ -1,7 +1,7 @@
 //VTOCSRAC JOB (RACIND),
 //             'SET RACF INDICATOR',
 //             CLASS=A,REGION=4M,
-//             MSGCLASS=A,
+//             MSGCLASS=A,USER=IBMUSER,PASSWORD=SYS1,
 //             MSGLEVEL=(0,0)
 //********************************************************************
 //*
@@ -71,17 +71,20 @@ DO I = 2 TO INDATA.0
     T = DATATYPE(SUBSTR(SECOND,2),W)
     RA = DATATYPE(SUBSTR(THIRD,3),W)
 
-    IF (SYS &  T & RA) | 'PASSWORD' = DATASET THEN DO
-        SAY '*** SKIPPING TEMP DATA SET' DATASET '('||STRIP(VOLUME)||')'
+    IF SYS & T & RA THEN DO
+        SAY '*** SKIPPING TEMP DATA SET' DATASET '('STRIP(VOLUME)')'
+        ITERATE
+    END
+    IF DATASET = 'PASSWORD' THEN DO
+        SAY '*** SKIPPING TEMP DATA SET' DATASET '('STRIP(VOLUME)')'
         ITERATE
     END
 
     IF SUBSTR(DATASET,1,1) = "1" THEN
         DATASET = SUBSTR(DATASET,2)
 
-    OUTCDSCB.TOTAL = "CDSCB '"||DATASET||"' VOL("||,
-         STRIP(VOLUME)        ||,
-         ") UNIT(SYSALLDA) SHR" RACF
+    VOL = STRIP(VOLUME)
+    OUTCDSCB.TOTAL = "CDSCB '"DATASET"' VOL("VOL") UNIT(SYSALLDA) SHR" RACF
 
     DROP INDATA.I
 

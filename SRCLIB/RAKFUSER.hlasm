@@ -18,7 +18,11 @@ CJYRUIDS CSECT                                                          00070000
 *                                  ENTERPRISE SYSTEMS GROUP          *  00180000
 *                                  2 MARC COURT                      *  00190000
 *                                  EDISON, NEW JERSEY 08820          *  00200000
-*                                                                    *  00210000
+*                                                                    *  00210100
+*   !!!!! DO NOT RENUMBER !!!!! enter NUMBER OFF before editing      *  00210110
+*                               But better is letting SMP doing      *  00210120
+*                               the EDIT.                            *  00210130
+*                                                                    *  00210140
 **********************************************************************  00220000
 *                                                                   @01 00220301
 *    Change History                                                 @01 00220601
@@ -40,22 +44,22 @@ CJYRUIDS CSECT                                                          00070000
 *                       authorized users can replace the in-core    @03 00225403
 *                       UDATA table                                 @03 00225703
 *                                                                   @03 00226003
-*    2026/02/28 RRKF004 The user table was stored in unprotected    @04 00227704
-*                       memory, meaning anyone with access to the   @04 00227704
-*                       LPAR could dump that table and reverse all  @04 00227704
+*    2026/02/28 RRKF004 The user table was stored in unprotected    @04 00226704
+*                       memory, meaning anyone with access to the   @04 00226804
+*                       LPAR could dump that table and reverse all  @04 00226904
 *                       the users information and their password    @04 00227704
-*                       Now those user tables reside in fetch       @04 00227704
-*                       protected memory                            @04 00227704
-*    2022/10/21 RRKF007 Remove the need to sort the input in        @07 00225707
-*                       alphabetical order. Allocate a core table   @07 00225807
-*                       of 1,000 entries, read the USERS member     @07 00225907
-*                       into this table and sort the table          @07 00226003
-*                       before processing.                          @07 00226303
-*    2026/03/01         Moving CBLK to fetch protected storage, so  @07 00226407
-*                       users can't dump the user table,            @07 00226417
-*                       tested logon with FTP, TSO and JOB card.    @07 00226427
-*                       Everything seems to work.                   @07 00226437
-********************************************************************@07 00226507
+*                       Now those user tables reside in fetch       @04 00227804
+*                       protected memory                            @04 00227904
+*    2022/10/21 RRKF007 Remove the need to sort the input in        @07 00228707
+*                       alphabetical order. Allocate a core table   @07 00228807
+*                       of 1,000 entries, read the USERS member     @07 00228907
+*                       into this table and sort the table          @07 00229007
+*                       before processing.                          @07 00229307
+*    2026/03/01         Moving CBLK to fetch protected storage, so  @07 00229407
+*                       users can't dump the user table,            @07 00229417
+*                       tested logon with FTP, TSO and JOB card.    @07 00229427
+*                       Everything seems to work.                   @07 00229437
+********************************************************************@07 00229507
 *                                                                       00230000
          SAVE   (14,12),,CJYRUIDS_&SYSDATE._&SYSTIME                    00240000
          LR     R12,R15             USE ENTRY AS BASE                   00250000
@@ -83,10 +87,10 @@ OK2GO    ENQ    (SECURITY,USERS,E,,SYSTEM),RET=HAVE serialization   @03 00370000
          BALR   R14,R15             call it                         @02 00376002
 *                                                                   @02 00378002
          OPEN   (CJYUDATA,(INPUT))  OPEN INPUT FILE                     00380000
-         MODESET MODE=SUP,KEY=ZERO  authorize ourselves                 00390000
-         XR     R5,R5               initialize GM chain             @01 00395001
-*                                                                   @07 00396007
-         GETMAIN RU,LV=80000           GETMAIN ROOM FOR 1000 ENT.   @07 00380107
+         MODESET MODE=SUP,KEY=ZERO  authorize ourselves                 00380050
+         XR     R5,R5               initialize GM chain             @01 00380101
+*                                                                   @07 00380107
+         GETMAIN RU,LV=80000           GETMAIN ROOM FOR 1000 ENT.   @07 00380157
          LR    R2,R1                   SAVE ITS ADDRESS             @07 00380207
          ST    R1,ADRTBL               SAVE FOR LATER USE           @07 00380307
          XR    R9,R9                   RECORD COUNTER               @07 00380407
@@ -136,19 +140,19 @@ SORT07   DS    0H                      ALL RECORDS DONE             @07 00386807
          SL    R9,=F'80'               POINT 1 RECORD BEFORE        @07 00387507
          LM    R4,R8,SAVESORT          RESTORE REGISTERS            @07 00387607
 *                                                                       00400000
-*        read the shadow (salt+hash) table into storage
-         OPEN   (SHADOW,(INPUT))   open shadow dataset
-         GETMAIN RU,LV=48000       room for 1000 shadow entries
-         LR     R2,R1              table address
-         ST     R1,ADRSHAD         save it
-         XR     R3,R3              shadow record counter
-SHADRLP  GET    SHADOW,(R2)        read a shadow record (48 bytes)
-         LA     R2,48(,R2)         next slot
-         LA     R3,1(,R3)          count it
-         B      SHADRLP            read next
-SHADEOD  ST     R3,SHADCNT         save count
-         CLOSE  (SHADOW)           close shadow dataset
-*                                                                       00400000
+*        read the shadow (salt+hash) table into storage                 00400010
+         OPEN   (SHADOW,(INPUT))   open shadow dataset                  00400020
+         GETMAIN RU,LV=48000       room for 1000 shadow entries         00400030
+         LR     R2,R1              table address                        00400040
+         ST     R1,ADRSHAD         save it                              00400050
+         XR     R3,R3              shadow record counter                00400060
+SHADRLP  GET    SHADOW,(R2)        read a shadow record (48 bytes)      00400070
+         LA     R2,48(,R2)         next slot                            00400080
+         LA     R3,1(,R3)          count it                             00400090
+         B      SHADRLP            read next                            00400100
+SHADEOD  ST     R3,SHADCNT         save count                           00400110
+         CLOSE  (SHADOW)           close shadow dataset                 00400120
+*                                                                       00400130
 READLOOP LA    R9,80(,R9)              NEXT RECORD IN TABLE         @07 00410000
          ICM   R1,15,0(R9)             END OF DATA?                 @07 00413001
          BZ    ENDDATA                 Y: ENTIRE TABLE PROCESSED    @07 00417001
@@ -188,21 +192,21 @@ MOVEUID  STC    R1,CBLKUSRL        SAVE LENGTH                          00680000
 MOVEGRP  STC    R1,CBLKGRPL        SAVE LENGTH                          00750000
          MVC    CBLKGRPN,GROUP     MOVE GROUP                           00760000
 *                                                                       00770000
-*        look up salt+hash for this userid in the shadow table
-         L      R2,ADRSHAD         address of shadow table
-         L      R3,SHADCNT         number of shadow entries
-         LTR    R3,R3              any entries?
-         BZ     MOVENOSH           no -> zero hash (login denied)
-MOVESHLP CLC    0(8,R2),USERID     userid match?
-         BE     MOVESHFN           yes, found
-         LA     R2,48(,R2)         next shadow entry
-         BCT    R3,MOVESHLP        check next
-         B      MOVENOSH           not found -> zero hash
-MOVESHFN MVC    CBLKSALT,8(R2)     copy salt (8 bytes)
-         MVC    CBLKHASH,16(R2)    copy hash (32 bytes)
-         B      MOVEOPER
-MOVENOSH XC     CBLKSALT,CBLKSALT  no salt
-         XC     CBLKHASH,CBLKHASH  no hash -> nothing matches
+*        look up salt+hash for this userid in the shadow table          00770010
+         L      R2,ADRSHAD         address of shadow table              00770020
+         L      R3,SHADCNT         number of shadow entries             00770030
+         LTR    R3,R3              any entries?                         00770040
+         BZ     MOVENOSH           no -> zero hash (login denied)       00770050
+MOVESHLP CLC    0(8,R2),USERID     userid match?                        00770060
+         BE     MOVESHFN           yes, found                           00770070
+         LA     R2,48(,R2)         next shadow entry                    00770080
+         BCT    R3,MOVESHLP        check next                           00770090
+         B      MOVENOSH           not found -> zero hash               00770100
+MOVESHFN MVC    CBLKSALT,8(R2)     copy salt (8 bytes)                  00770110
+         MVC    CBLKHASH,16(R2)    copy hash (32 bytes)                 00770120
+         B      MOVEOPER                                                00770130
+MOVENOSH XC     CBLKSALT,CBLKSALT  no salt                              00770140
+         XC     CBLKHASH,CBLKHASH  no hash -> nothing matches           00770150
 MOVEOPER MVC    CBLKFLG1,OPERFLAG  MOVE OPER FLAG TO ENTRY.             00860000
 *                                                                       00870000
          B      ADDGROUP           ADD CONNECTS                         00880000
@@ -249,10 +253,10 @@ ANYMORE  LTR    R5,R4              MORE ENTRIES?                        01290000
 *                                                                       01310000
          TM     TERMFLAG,TERMABND  WAS AN ABEND REQUESTED?              01320000
          BO     ABEND200               Y-ABEND                          01330000
-         L     R2,ADRTBL               ADDRESS OF TEMP. CORE TABLE  @07 01361007
-         FREEMAIN RU,LV=80000,A=(2)    RELEASE WHILE STILL KEY=0    @07 01361207
-         L     R2,ADRSHAD              ADDRESS OF SHADOW TABLE
-         FREEMAIN RU,LV=48000,A=(2)    RELEASE SHADOW TABLE
+         L     R2,ADRTBL               ADDRESS OF TEMP. CORE TABLE  @07 01331007
+         FREEMAIN RU,LV=80000,A=(2)    RELEASE WHILE STILL KEY=0    @07 01331207
+         L     R2,ADRSHAD              ADDRESS OF SHADOW TABLE          01331300
+         FREEMAIN RU,LV=48000,A=(2)    RELEASE SHADOW TABLE             01331400
 BYEBYE   MODESET MODE=PROB,KEY=NZERO   return to problem state          01340000
          CLOSE (CJYUDATA)              close input dataset              01350000
          DEQ   (SECURITY,USERS,,SYSTEM) release ENQ                 @01 01355001
@@ -291,7 +295,7 @@ TRTBLANK DC     XL256'00'          TABLE FOR TRT                        01600000
 *                                                                       01640000
          PRINT  NOGEN                                                   01650000
 CJYUDATA DCB    DDNAME=RAKFUSER,MACRF=GM,EODAD=ENDLOOP,DSORG=PS     @07 01660000
-SHADOW   DCB    DDNAME=RAKFSHAD,MACRF=GM,EODAD=SHADEOD,DSORG=PS
+SHADOW   DCB    DDNAME=RAKFSHAD,MACRF=GM,EODAD=SHADEOD,DSORG=PS         01660100
 *                                                                       01670000
 RAKFPSAV DC     V(RAKFPSAV)        password change utility          @02 01673002
 RAKFADM  DC     CL39'RAKFADM'      facility name to authorize       @03 01675003
@@ -318,12 +322,12 @@ OLDUSER  DS     CL8                                                     01850000
 OLDGROUP DS     CL8                                                     01870000
          DS     XL(80-(*-OLDREC))                                       01880000
 *                                                                       01890000
-SAVESORT DS    5F                      SAVE REGISTERS SORT          @07 01682007
-SWAPLAST DS    F                       LAST RECORD SWAPPED          @07 01682207
-ADRTBL   DS    F                       ADDRESS OF TEMP TABLE        @07 01682307
-ADRSHAD  DS    F                       ADDRESS OF SHADOW TABLE
-SHADCNT  DS    F                       NUMBER OF SHADOW ENTRIES
-*                                                                       01890100
+SAVESORT DS    5F                      SAVE REGISTERS SORT          @07 01891007
+SWAPLAST DS    F                       LAST RECORD SWAPPED          @07 01892207
+ADRTBL   DS    F                       ADDRESS OF TEMP TABLE        @07 01892307
+ADRSHAD  DS    F                       ADDRESS OF SHADOW TABLE          01892400
+SHADCNT  DS    F                       NUMBER OF SHADOW ENTRIES         01892500
+*                                                                       01892600
 R0       EQU    00                                                      01900000
 R1       EQU    01                                                      01910000
 R2       EQU    02                                                      01920000

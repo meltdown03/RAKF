@@ -121,10 +121,10 @@ RHSETLN  ST    R7,RHTOTL          remember total bytes
 **********************************************************************
 RHBLOCK  DS    0H
 *
-* --- Load W[0..15] from the current block (big-endian, direct) --- *
+* --- Load W(0..15) from the current block (big-endian, direct) --- *
 *
          L     R5,RHBLKP          -> current 64-byte block
-         LA    R4,RHW             -> W[0]
+         LA    R4,RHW             -> W(0)
          LA    R3,16
 RHWLD    L     R0,0(,R5)
          ST    R0,0(,R4)
@@ -133,16 +133,16 @@ RHWLD    L     R0,0(,R5)
          BCT   R3,RHWLD
          SPACE 1
 *
-* --- Extend the schedule W[16..63] ------------------------------- *
-* ---   R4 walks a window whose base is W[t-16]:                    *
-* ---     W[t-16]=0(R4) W[t-15]=4(R4) W[t-7]=36(R4)                 *
-* ---     W[t-2]=56(R4) W[t]=64(R4)                                 *
+* --- Extend the schedule W(16..63) ------------------------------- *
+* ---   R4 walks a window whose base is W(t-16):                    *
+* ---     W(t-16)=0(R4) W(t-15)=4(R4) W(t-7)=36(R4)                 *
+* ---     W(t-2)=56(R4) W(t)=64(R4)                                 *
 *
          LA    R4,RHW
          LA    R3,48              t = 16..63
 RHEXT    DS    0H
-*        s0 = ror(W[t-15],7) X ror(W[t-15],18) X (W[t-15] >> 3)
-         L     R6,4(,R4)          W[t-15]
+*        s0 = ror(W(t-15),7) X ror(W(t-15),18) X (W(t-15) >> 3)
+         L     R6,4(,R4)          W(t-15)
          LR    R0,R6
          SRL   R0,7
          LR    R1,R6
@@ -157,8 +157,8 @@ RHEXT    DS    0H
          LR    R7,R6
          SRL   R7,3               shr3
          XR    R0,R7              R0 = s0
-*        s1 = ror(W[t-2],17) X ror(W[t-2],19) X (W[t-2] >> 10)
-         L     R6,56(,R4)         W[t-2]
+*        s1 = ror(W(t-2),17) X ror(W(t-2),19) X (W(t-2) >> 10)
+         L     R6,56(,R4)         W(t-2)
          LR    R7,R6
          SRL   R7,17
          LR    R1,R6
@@ -173,12 +173,12 @@ RHEXT    DS    0H
          LR    R8,R6
          SRL   R8,10              shr10
          XR    R7,R8              R7 = s1
-*        W[t] = W[t-16] + s0 + W[t-7] + s1
+*        W(t) = W(t-16) + s0 + W(t-7) + s1
          L     R1,0(,R4)          W[t-16]
          ALR   R1,R0              + s0
-         AL    R1,36(,R4)         + W[t-7]
+         AL    R1,36(,R4)         + W(t-7)
          ALR   R1,R7              + s1
-         ST    R1,64(,R4)         -> W[t]
+         ST    R1,64(,R4)         -> W(t)
          LA    R4,4(,R4)
          BCT   R3,RHEXT
          SPACE 1
@@ -189,7 +189,7 @@ RHEXT    DS    0H
          SPACE 1
 *
 * --- 64 compression rounds --------------------------------------- *
-* ---   R4 -> W[t]   R5 -> K[t]   R3 = round counter                *
+* ---   R4 -> W(t)   R5 -> K(t)   R3 = round counter                *
 *
          LA    R4,RHW
          LA    R5,RHK
@@ -222,12 +222,12 @@ RHROUND  DS    0H
          X     R1,=X'FFFFFFFF'    NOT e
          NR    R8,R1              (NOT e) AND g
          XR    R7,R8              R7 = ch
-*        temp1 = h + S1 + ch + K[t] + W[t]
+*        temp1 = h + S1 + ch + K(t) + W(t)
          L     R9,RHHH            h
          ALR   R9,R0              + S1
          ALR   R9,R7              + ch
-         AL    R9,0(,R5)          + K[t]
-         AL    R9,0(,R4)          + W[t]      R9 = temp1
+         AL    R9,0(,R5)          + K(t)
+         AL    R9,0(,R4)          + W(t)      R9 = temp1
 *        S0 = ror(a,2) X ror(a,13) X ror(a,22)
          L     R6,RHA
          LR    R0,R6
@@ -279,7 +279,7 @@ RHROUND  DS    0H
          LR    R1,R9
          ALR   R1,R0
          ST    R1,RHA             a := temp1 + temp2
-*        advance to next W[t] / K[t]
+*        advance to next W(t) / K(t)
          LA    R4,4(,R4)
          LA    R5,4(,R5)
          BCT   R3,RHROUND

@@ -15,7 +15,7 @@
          DC    CL80'//            DISP=SHR'                             04870017
 /*
 //SMPCNTL  DD  *
- /* REJECT  SELECT(ZPY0001). */
+ REJECT  SELECT(ZPY0001). 
  RESETRC
  .
  RECEIVE SELECT(ZPY0001)
