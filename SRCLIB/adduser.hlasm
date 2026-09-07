@@ -629,9 +629,9 @@ SHDHASH  DS    CL32                    HASH                             00062800
          DS    C                       -1                               00063000
 USERREC  DS    0CL80                   User record                      00063100
 USERUID  DS    CL8                     Contains UserID                  00063200
-USERDFT  DS    C                       * for default group              00063300
-USERGRP  DS    CL8                     Group                            00063400
          DS    C                                                        00063500
+USERGRP  DS    CL8                     Group                            00063400
+USERDFT  DS    C                       * for default group              00063300
 USERPWD  DS    CL8                     Password is blanked out          00063600
          DS    C                                                        00063700
 USEROPR  DS    C                       Operations / Nooperations        00063800
