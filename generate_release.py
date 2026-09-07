@@ -37,9 +37,24 @@ arg_parser.add_argument('--codepage', default="cp037",
 arg_parser.add_argument('--no-tools', action="store_true",
                         help="Emit the RAKF core only, without the admin tools")
 arg_parser.add_argument('--recv370', action="store_true",
-                        help="Unpack the admin-tool XMIT with RECV370 (SYSC.LINKLIB) "
+                        help="Unpack the admin-tool XMIT with RECV370 (SYS2.LINKLIB) "
                              "instead of TSO RECEIVE. Needed when RAKF is installed "
                              "during a sysgen, before the TSO XMIT facility exists.")
+arg_parser.add_argument('--shadow-recovery', action='store_true',
+                        help="Emit only a standalone EBCDIC job that recreates and "
+                             "populates the RAKF password shadow dataset from users.txt")
+arg_parser.add_argument('--shadow-dsn', default="SYS1.SECURE.SHADOW",
+                        help="Shadow dataset name for --shadow-recovery")
+arg_parser.add_argument('--shadow-volume', default=None,
+                        help="Optional VOL=SER for a newly recreated shadow dataset")
+arg_parser.add_argument('--run-rakfuser', action='store_true',
+                        help="After shadow recovery, EXEC the installed RAKFUSER procedure "
+                             "to reload the in-core user table (otherwise IPL/reload later)")
+arg_parser.add_argument('--upgrade', action='store_true',
+                        help="Generate an in-place RAKF upgrade job instead of a fresh install")
+arg_parser.add_argument('--upgrade-from', default='TRKF126',
+                        help="Previous RAKF function FMID whose elements TRKF200 replaces "
+                             "(default: TRKF126)")
 args = arg_parser.parse_args()
 
 running_folder = os.path.dirname(os.path.abspath(__file__))
@@ -62,6 +77,155 @@ def emit_text(text):
         emit(l.rstrip())
 
 
+APPLY_GUARD = "(4,LT,APPLYR.HMASMP)"
+
+
+def _exec_line(line):
+    """True for a named JCL EXEC statement (not comments/continuations)."""
+    if not line.startswith('//') or line.startswith('//*'):
+        return False
+    body = line[2:]
+    return bool(body) and not body[0].isspace() and ' EXEC ' in line
+
+
+def _exec_continuation(line):
+    """True for a blank-name JCL continuation card such as // PARM=... ."""
+    if not line.startswith('//') or line.startswith('//*'):
+        return False
+    body = line[2:]
+    return bool(body) and body[0].isspace()
+
+
+def _next_exec_continuation(lines, index):
+    """Return True when the EXEC at index is followed by an active continuation.
+
+    JCL comments and blank cards may occur between continuation cards, so ignore
+    those while looking ahead. A named JCL statement ends the EXEC statement.
+    """
+    for j in range(index + 1, len(lines)):
+        r = lines[j].rstrip()
+        if not r or r.startswith('//*'):
+            continue
+        return _exec_continuation(r)
+    return False
+
+
+def _exec_has_cond(lines, index):
+    """Check the EXEC card and its active continuation cards for COND=."""
+    r = lines[index].rstrip()
+    if 'COND=' in r.upper():
+        return True
+
+    for j in range(index + 1, len(lines)):
+        s = lines[j].rstrip()
+        if not s or s.startswith('//*'):
+            continue
+        if not _exec_continuation(s):
+            break
+        if 'COND=' in s.upper():
+            return True
+        # A continuation without a trailing comma completes the EXEC.
+        if not s.endswith(','):
+            break
+    return False
+
+
+def _split_exec_for_guard(line):
+    """Make a noncontinued EXEC continuable without using column 72.
+
+    MVS JCL's statement field ends at column 71.  If an EXEC already occupies
+    all 71 columns, simply appending ',' puts the comma in column 72 and JES
+    reports IEF618I.  Move the last top-level EXEC operand to a continuation
+    card instead.
+
+    Example:
+      //ASMCDSCB EXEC PGM=IFOX00,REGION=2048K,PARM=(...)
+    becomes:
+      //ASMCDSCB EXEC PGM=IFOX00,REGION=2048K,
+      //         PARM=(...),
+    """
+    line = line.rstrip()
+    if line.endswith(','):
+        return [line]
+
+    # If there is room for a comma in the actual JCL statement field, use it.
+    # Column 71 is the last usable character, so the existing line may be at
+    # most 70 columns before the comma is appended.
+    if len(line) <= 70:
+        return [line + ',']
+
+    # Find top-level commas (ignore commas inside quotes/parentheses) and move
+    # the shortest possible final operand to a continuation card.
+    comma_positions = []
+    depth = 0
+    quote = None
+    for i, ch in enumerate(line):
+        if quote:
+            if ch == quote:
+                quote = None
+            continue
+        if ch in ("'", '"'):
+            quote = ch
+        elif ch == '(':
+            depth += 1
+        elif ch == ')':
+            if depth:
+                depth -= 1
+        elif ch == ',' and depth == 0:
+            comma_positions.append(i)
+
+    prefix = '//         '
+    for pos in reversed(comma_positions):
+        head = line[:pos + 1]
+        tail = line[pos + 1:].strip()
+        continuation = prefix + tail + ','
+        if len(head) <= 71 and len(continuation) <= 71:
+            return [head, continuation]
+
+    sys.exit('generate_release.py: cannot safely add APPLY guard to EXEC '
+             'within JCL columns 1-71:\n  {}'.format(line))
+
+
+def emit_jcl_line(line, guard_apply=False, exec_continues=False,
+                  existing_cond=False):
+    """Emit one JCL line, optionally bypassing the step if core APPLY failed.
+
+    When the original EXEC already has continuation cards, the inserted COND
+    must itself end in a comma.  When there is no following continuation, COND
+    closes the EXEC statement.  Full-width EXEC cards are split first so no
+    continuation comma is ever placed in column 72.
+    """
+    line = line.rstrip()
+    if (guard_apply and args.upgrade and _exec_line(line)
+            and not existing_cond):
+        if line.endswith(','):
+            emit(line)
+        else:
+            for part in _split_exec_for_guard(line):
+                emit(part)
+        suffix = ',' if exec_continues else ''
+        emit('//         COND={}{}'.format(APPLY_GUARD, suffix))
+    else:
+        emit(line)
+
+
+def emit_guarded_lines(lines):
+    """Emit JCL lines with an APPLY guard added safely to complete EXEC statements."""
+    for i, l in enumerate(lines):
+        r = l.rstrip()
+        emit_jcl_line(
+            r,
+            guard_apply=True,
+            exec_continues=_next_exec_continuation(lines, i) if _exec_line(r) else False,
+            existing_cond=_exec_has_cond(lines, i) if _exec_line(r) else False,
+        )
+
+
+def emit_guarded_text(text):
+    """Emit a post-APPLY JCL block with the upgrade APPLY guard on each step."""
+    emit_guarded_lines(text.split('\n'))
+
+
 steps = []
 
 
@@ -75,31 +239,338 @@ def check_step(line, jcl_filename):
             raise ValueError("Duplicate Step Name {} (from {}) Already exists".format(step_name, jcl_filename))
 
 
-def read_file(filename):
+def read_file(filename, guard_apply=False):
     emit("//*" + "*" * 66)
     emit("//* {}".format("/".join(filename.split("/")[-2:])))
     emit("//*" + "*" * 66)
     with open(filename, 'r') as f:
-        jobcard = True
-        for l in f.readlines():
-            if l.strip() == "//":
+        raw = f.readlines()
+
+    jobcard = True
+    lines = []
+    for l in raw:
+        if l.strip() == "//":
+            continue
+        if not l.strip():
+            continue
+        if jobcard:
+            if l.strip()[-1] == ",":
                 continue
-            if not l.strip():
+            jobcard = False
+            continue
+        lines.append(l.rstrip())
+
+    if guard_apply and args.upgrade:
+        emit_guarded_lines(lines)
+    else:
+        for l in lines:
+            emit(l)
+
+    for l in lines:
+        check_step(l, filename)
+
+
+# VTOCSRAC's original REXX generates commands such as:
+#   CDSCB 'dsn' VOL(vol) UNIT(SYSALLDA) SHR RACF
+# RACINDVT feeds those records to IKJEFT01 through SYSTSIN.  Batch TSO uses
+# only columns 1-72, so sufficiently long data set names lose the end of RACF
+# (one observed command ended "... SHR R" and failed as "R AMBIGUOUS").
+#
+# The original generator also emits commands for data sets whose indicator is
+# already in the requested state.  Besides wasting hundreds of CDSCB calls,
+# that makes an otherwise-good run return RC 12 when an already-indicated data
+# set happens to be allocated elsewhere.
+#
+# Keep the upstream VTOCSRAC scanner, but place its commands in an FB128 work
+# data set.  A small BREXX filter then:
+#   1. compares each command against the VTOC "DSNAME VOLUME RACF" report,
+#   2. drops commands that would be a no-op, and
+#   3. compacts commands to "CDSCB 'dsn' V(vol) SHR RACF".
+#
+# CDSCB's parser defines VOLUME and UNIT as separate optional top-level
+# keywords.  "V(" is an unambiguous abbreviation of VOLUME at that level and,
+# without UNIT(SYSALLDA), the longest legal 44-character MVS DSN produces a
+# 71-character command -- safely inside the 72-column SYSTSIN command field.
+VTOCSRAC_FILTER = r"""//*******************************************************************
+//* Filter and compact CDSCB commands before batch TSO executes them.
+//*******************************************************************
+//CDSCBF  EXEC PGM=BREXX,PARM='RXRUN',REGION=8192K
+//RXRUN   DD *
+/* Filter/compact VTOCSRAC CDSCB commands for batch TSO */
+address mvs
+"EXECIO * DISKR STATDD (STEM ST. FINIS"
+"EXECIO * DISKR CMDIN (STEM CM. FINIS"
+n=0
+skip=0
+bad=0
+do i=1 to cm.0
+  cmd=strip(cm.i)
+  if left(cmd,6)<>'CDSCB' then iterate
+  q1=pos("'",cmd)
+  q2=pos("'",cmd,q1+1)
+  vp=pos('VOL(',cmd)
+  ve=pos(')',cmd,vp+4)
+  if q1=0 | q2=0 | vp=0 | ve=0 then do
+    say '*** BAD CDSCB COMMAND:' cmd
+    bad=bad+1
+    iterate
+  end
+  dsn=substr(cmd,q1+1,q2-q1-1)
+  vol=substr(cmd,vp+4,ve-vp-4)
+  action=translate(word(cmd,words(cmd)))
+  cur=''
+  do j=1 to st.0
+    sdsn=strip(substr(st.j,1,44))
+    svol=strip(substr(st.j,46,6))
+    sind=strip(substr(st.j,55,1))
+    if sdsn=dsn & svol=vol then do
+      if sind='Y' | sind='N' then cur=sind
+      leave
+    end
+  end
+  if action='RACF' & cur='Y' then do
+    skip=skip+1
+    iterate
+  end
+  if action='NORACF' & cur='N' then do
+    skip=skip+1
+    iterate
+  end
+  if action<>'RACF' & action<>'NORACF' then do
+    say '*** BAD CDSCB ACTION:' cmd
+    bad=bad+1
+    iterate
+  end
+  short="CDSCB '"||dsn||"' V("||vol||") SHR "||action
+  if length(short)>72 then do
+    say '*** CDSCB COMMAND STILL TOO LONG:' short
+    bad=bad+1
+    iterate
+  end
+  n=n+1
+  out.n=short
+end
+out.0=n
+"EXECIO * DISKW CMDOUT (STEM OUT. FINIS"
+say '*** VTOCSRAC:' n 'COMMANDS,' skip 'ALREADY CORRECT'
+if bad>0 then do
+  say '*** VTOCSRAC FILTER ERRORS:' bad
+  exit 8
+end
+exit 0
+/*
+//RXLIB   DD DSN=BREXX.V2R5M3.RXLIB,DISP=SHR
+//STATDD  DD DSN=&&LISTCC,DISP=SHR
+//CMDIN   DD DSN=&&CDRAW,DISP=(OLD,DELETE)
+//CMDOUT  DD DSN=&&CDSCB,DISP=(,PASS),UNIT=VIO,SPACE=(TRK,(5,5)),
+//            DCB=(LRECL=80,BLKSIZE=800,RECFM=FB)
+//STDIN   DD DUMMY
+//STDOUT  DD SYSOUT=*,DCB=(RECFM=FB,LRECL=140,BLKSIZE=5600)
+//STDERR  DD SYSOUT=*,DCB=(RECFM=FB,LRECL=140,BLKSIZE=5600)"""
+
+
+def emit_vtocsrac(filename, guard_apply=False):
+    """Emit VTOCSRAC with a restart-safe RACINDVT command filter.
+
+    The upstream EXEC/BREXX step is retained unchanged except that its OUTDD is
+    widened to FB128 and renamed &&CDRAW.  CDSCBF filters/compacts that stream
+    to the original FB80 &&CDSCB data set immediately before RACINDVT.
+    """
+    emit("//*" + "*" * 66)
+    emit("//* {}".format("/".join(filename.split("/")[-2:])))
+    emit("//*" + "*" * 66)
+
+    with open(filename, 'r') as f:
+        raw = f.readlines()
+
+    # Strip the source job card just like read_file().
+    jobcard = True
+    lines = []
+    for l in raw:
+        if l.strip() == "//" or not l.strip():
+            continue
+        if jobcard:
+            if l.strip().endswith(","):
                 continue
-            if jobcard:
-                if l.strip()[-1] == ",":
-                    continue
-                else:
-                    jobcard = False
-                    continue
-            emit(l.rstrip())
-            check_step(l, filename)
+            jobcard = False
+            continue
+        lines.append(l.rstrip())
+
+    outdd_seen = False
+    dcb_seen = False
+    racindvt_seen = False
+    transformed = []
+    in_cmd_outdd = False
+
+    for l in lines:
+        r = l
+
+        # Capture the original generated CDSCB commands before IKJEFT01's
+        # 72-column SYSTSIN limit can truncate them.  FB128 also covers a
+        # maximum-length (44 byte) MVS data set name in the old verbose form.
+        if r.startswith("//OUTDD") and "DSN=&&CDSCB" in r:
+            r = r.replace("DSN=&&CDSCB", "DSN=&&CDRAW", 1)
+            outdd_seen = True
+            in_cmd_outdd = True
+        elif in_cmd_outdd and "DCB=(" in r:
+            if "LRECL=80" not in r or "BLKSIZE=800" not in r:
+                sys.exit("generate_release.py: unexpected VTOCSRAC OUTDD DCB: {}"
+                         .format(r))
+            r = r.replace("LRECL=80", "LRECL=128", 1)
+            r = r.replace("BLKSIZE=800", "BLKSIZE=1280", 1)
+            dcb_seen = True
+            in_cmd_outdd = False
+
+        if r.startswith("//RACINDVT") and _exec_line(r):
+            if racindvt_seen:
+                sys.exit("generate_release.py: duplicate RACINDVT in {}"
+                         .format(filename))
+            transformed.extend(VTOCSRAC_FILTER.split("\n"))
+            racindvt_seen = True
+
+        transformed.append(r)
+
+    missing = []
+    if not outdd_seen:
+        missing.append("OUTDD DSN=&&CDSCB")
+    if not dcb_seen:
+        missing.append("OUTDD DCB=(LRECL=80,BLKSIZE=800,...)")
+    if not racindvt_seen:
+        missing.append("//RACINDVT EXEC")
+    if missing:
+        sys.exit("generate_release.py: VTOCSRAC layout not recognized; missing: {}"
+                 .format(", ".join(missing)))
+
+    # The Python card emitter must never silently create >80 byte records.
+    # JCL itself is kept <=71 where practical; inline REXX may use all 80.
+    too_long = [(i + 1, l) for i, l in enumerate(transformed) if len(l) > 80]
+    if too_long:
+        n, l = too_long[0]
+        sys.exit("generate_release.py: VTOCSRAC generated card {} exceeds 80 "
+                 "columns ({}): {}".format(n, len(l), l))
+
+    if guard_apply and args.upgrade:
+        emit_guarded_lines(transformed)
+    else:
+        for l in transformed:
+            emit(l)
+
+    for l in transformed:
+        check_step(l, filename)
 
 
 def _data_file(arg, default):
     """Resolve a users/profiles file path (relative paths are under the repo)."""
     fn = arg if arg else default
     return fn if os.path.isabs(fn) else os.path.join(running_folder, fn)
+
+
+def emit_header(filename):
+    """Emit 01_header.template with the fixes needed by an upgrade.
+
+    RESETRC lets the ACDS UCLIN run even when harmless CDS deletes report RC 8.
+    During an upgrade ICHSFR00 must remain in LPALIB because SMP can use the
+    existing LMOD as link-edit input while changing functional ownership.
+
+    01_header.template also contains the FUNCTION's ++VER MCS, so upgrade mode
+    adds VERSION(TRKF126) there.  JCLIN/TRKF200.jcl contains only the JCLIN
+    body and therefore must not be searched for ++VER.
+    """
+    with open(filename) as f:
+        lines = f.readlines()
+
+    # The V2 target/distribution libraries named by the LIBS step are release
+    # work libraries.  On an upgrade/retry they may already exist from an
+    # earlier attempt.  Since LIBS allocates them NEW, that otherwise ends in:
+    #   IEF253I ... LIBS ASAMPLIB - DUPLICATE NAME ON DIRECT ACCESS VOLUME
+    # Recreate them from scratch so a retry cannot reuse stale V2 members.
+    upgrade_lib_dsns = []
+    if args.upgrade:
+        in_libs = False
+        for raw in lines:
+            r = raw.rstrip()
+            if _exec_line(r):
+                if r.startswith('//LIBS '):
+                    in_libs = True
+                    continue
+                if in_libs:
+                    break
+            if in_libs and 'DSN=' in r.upper():
+                dsn = r.upper().split('DSN=', 1)[1].split(',', 1)[0].strip()
+                if dsn and dsn not in upgrade_lib_dsns:
+                    upgrade_lib_dsns.append(dsn)
+
+    last_control = ''
+    found_ver = False
+    cleanup_emitted = False
+    for l in lines:
+        stripped = l.strip()
+
+        if (args.upgrade and not cleanup_emitted and
+                l.rstrip().startswith('//LIBS ') and _exec_line(l.rstrip())):
+            emit('//* UPGRADE: remove stale V2 target/distribution libraries')
+            emit('//CLNV2LIB EXEC PGM=IDCAMS')
+            emit('//SYSPRINT DD SYSOUT=*')
+            emit('//SYSIN    DD *')
+            for dsn in upgrade_lib_dsns:
+                emit('  DELETE {} PURGE'.format(dsn))
+            emit('  SET MAXCC=0')
+            emit('/*')
+            check_step('//CLNV2LIB EXEC PGM=IDCAMS', filename)
+            cleanup_emitted = True
+
+        if stripped == 'UCLIN ACDS .' and last_control != 'RESETRC.':
+            emit(' RESETRC.')
+
+        if args.upgrade and 'SCRATCH ' in l and 'MEMBER=ICHSFR00' in l:
+            emit('//* UPGRADE: keep ICHSFR00; SMP may use the old LMOD as input')
+            continue
+
+        if args.upgrade and stripped.startswith('++VER('):
+            found_ver = True
+            if 'VERSION(' not in stripped.upper():
+                r = l.rstrip()
+                if r.endswith('.'):
+                    l = r[:-1] + ' VERSION({}).'.format(args.upgrade_from.upper())
+                else:
+                    l = r + ' VERSION({})'.format(args.upgrade_from.upper())
+
+        emit(l.rstrip())
+        check_step(l, filename)
+        if stripped and not stripped.startswith('***'):
+            last_control = stripped
+
+    if args.upgrade and not found_ver:
+        sys.exit('generate_release.py: no ++VER statement found in '
+                 'TEMPLATES/01_header.template')
+
+
+def emit_trkf200_jclin(filename):
+    """Emit TRKF200 JCLIN after verifying the V2 password-hash linkage."""
+    with open(filename) as f:
+        text = f.read().rstrip()
+
+    # V2 ICHSFR00 must contain both hashing CSECTs. Refuse to generate a deck
+    # from an old/stale JCLIN, because that produces a load module that links
+    # with unresolved RAKFPWH and fails at TSO logon.
+    required = ('INCLUDE SYSPUNCH(RAKFHASH)', 'INCLUDE SYSPUNCH(RAKFPWH)')
+    missing = [item for item in required if item not in text]
+    if missing:
+        sys.exit('generate_release.py: JCLIN/TRKF200.jcl is missing: {}'
+                 .format(', '.join(missing)))
+
+    emit_text(text)
+
+
+def emit_smp_tail(filename):
+    """Emit 02_smp4.template, preventing ACCEPT after a failed APPLY."""
+    with open(filename) as f:
+        for l in f.readlines():
+            r = l.rstrip()
+            if r.startswith('//ACCEPTR ') and ' EXEC ' in r and 'COND=' not in r.upper():
+                r += ',COND={}'.format(APPLY_GUARD)
+            emit(r)
+            check_step(l, filename)
 
 
 # ------------------------------------------------------------------ #
@@ -160,7 +631,7 @@ SHADOW_LOAD = """//*************************************************************
 //*******************************************************************
 //SHADLOAD EXEC PGM=IEBGENER
 //SYSPRINT DD SYSOUT=*
-//SYSUT2   DD DSN=SYS1.SECURE.SHADOW,DISP=SHR
+//SYSUT2   DD DSN={dsn},DISP=SHR
 //SYSUT1   DD DATA,DLM='{dlm}'"""
 
 SHADOW_LOAD_SYSIN = """//SYSIN    DD *
@@ -168,7 +639,7 @@ SHADOW_LOAD_SYSIN = """//SYSIN    DD *
   RECORD FIELD=(48,1,,1)"""
 
 
-def emit_shadow_load(shadow):
+def emit_shadow_load(shadow, dsn="SYS1.SECURE.SHADOW"):
     """Emit a job that loads the (host-computed) shadow records into
     SYS1.SECURE.SHADOW.  The FB48 records don't align to 80-byte cards, so each
     is padded to 80 for transport and IEBGENER's RECORD FIELD trims it to 48."""
@@ -181,19 +652,20 @@ def emit_shadow_load(shadow):
     dlm = pick_dlm(bytes(cards))
     sys.stderr.write("[gen] shadow: {} user(s), {} bytes (DLM={})\n"
                      .format(len(shadow) // 48, len(shadow), dlm))
-    emit_text(SHADOW_LOAD.format(dlm=dlm))
+    (emit_guarded_text if args.upgrade else emit_text)(
+        SHADOW_LOAD.format(dlm=dlm, dsn=dsn))
     OUT.extend(cards)          # raw binary, 80-byte cards
     emit(dlm)
-    emit_text(SHADOW_LOAD_SYSIN)
+    (emit_guarded_text if args.upgrade else emit_text)(SHADOW_LOAD_SYSIN)
 
 
 def emit_rakfcust(filename, inserts):
-    """Emit RAKFCUST.jcl into the stream, splicing `inserts` (the blanked users
-    table and the profiles table) into its first two `//SYSUT1 DD *` placeholders
-    (the USERSIEB and PROFSIEB IEBGENER steps).  Later instream SYSUT1s -- e.g.
-    the SORTREXX script -- are left untouched, and the source file is NOT
-    modified (unlike the old in-place rewrite, which mis-matched every 'SYSUT1'
-    and could corrupt the member)."""
+    """Emit RAKFCUST.jcl, splicing USERS/PROFILES and handling upgrades.
+
+    On an upgrade SYS1.SECURE.PWUP and SYS1.SECURE.CNTL already exist, so the
+    ALLOC step references them DISP=SHR instead of attempting DISP=NEW. SHADOW
+    is still allocated by the original RAKFCUST JCL after a guarded delete.
+    """
     emit("//*" + "*" * 66)
     emit("//* {}".format("/".join(filename.split("/")[-2:])))
     emit("//*" + "*" * 66)
@@ -201,8 +673,9 @@ def emit_rakfcust(filename, inserts):
         lines = f.read().split('\n')
     jobcard = True
     skipping = False          # dropping an old placeholder body up to its /*
+    skip_dd_cont = False      # dropping allocation continuations for reused DSNs
     n = 0                     # number of placeholders filled so far
-    for l in lines:
+    for line_index, l in enumerate(lines):
         if l.strip() == "//" or not l.strip():
             continue
         if jobcard:
@@ -215,7 +688,31 @@ def emit_rakfcust(filename, inserts):
                 skipping = False
                 emit(l.rstrip())
             continue
-        emit(l.rstrip())
+
+        # In upgrade mode these two datasets came from the previous RAKF
+        # installation. Keep them and suppress the UNIT/DCB/SPACE continuation
+        # cards belonging to their original DISP=(,CATLG) allocation DDs.
+        if args.upgrade and skip_dd_cont:
+            if l.startswith('//') and len(l) > 2 and l[2].isspace():
+                continue
+            skip_dd_cont = False
+        if args.upgrade and l.startswith('//PWUP') and 'SYS1.SECURE.PWUP' in l:
+            emit('//PWUP    DD DISP=SHR,DSN=SYS1.SECURE.PWUP')
+            skip_dd_cont = True
+            continue
+        if args.upgrade and l.startswith('//RAKF') and 'SYS1.SECURE.CNTL' in l:
+            emit('//RAKF    DD DISP=SHR,DSN=SYS1.SECURE.CNTL')
+            skip_dd_cont = True
+            continue
+
+        emit_jcl_line(
+            l,
+            guard_apply=True,
+            exec_continues=_next_exec_continuation(lines, line_index)
+                           if _exec_line(l.rstrip()) else False,
+            existing_cond=_exec_has_cond(lines, line_index)
+                          if _exec_line(l.rstrip()) else False,
+        )
         check_step(l, filename)
         toks = l.split()
         if n < 2 and len(toks) >= 3 and toks[0] == "//SYSUT1" \
@@ -281,7 +778,7 @@ TOOLS_HEADER = """//************************************************************
 #                which needs MVP, which needs RAKF. Installing RAKF during a
 #                sysgen therefore hits 'IKJ56500I COMMAND RECEIVE NOT FOUND'.
 #
-#   RECV370      a standalone unXMIT program in SYSC.LINKLIB, present from the
+#   RECV370      a standalone unXMIT program in SYS2.LINKLIB, present from the
 #                base sysgen onward (sysgen's own BREXX step uses it), so it
 #                works before TSO RECEIVE exists. Selected with --recv370.
 #
@@ -296,7 +793,7 @@ TOOLS_RECV_TSO = """//* --- RECEIVE the XMIT into a transient load library -----
 
 TOOLS_RECV_370 = """//* --- unXMIT into a transient load library with RECV370 ----------
 //RECV    EXEC PGM=RECV370,REGION=4096K
-//STEPLIB  DD DISP=SHR,DSN=SYSC.LINKLIB
+//STEPLIB  DD DISP=SHR,DSN=SYS2.LINKLIB
 //RECVLOG  DD SYSOUT=*
 //XMITIN   DD DSN=RAKF.TOOLS.XMIT,DISP=SHR
 //SYSPRINT DD SYSOUT=*
@@ -325,7 +822,7 @@ TOOLS_INSTALL = """//* --- copy the tool members into the command library ------
 
 HELP_HEADER = """//* --- TSO HELP members for the admin commands -------------------
 //HELPLOAD EXEC PGM=PDSLOAD
-//STEPLIB  DD DSN=SYSC.LINKLIB,DISP=SHR
+//STEPLIB  DD DSN=SYS2.LINKLIB,DISP=SHR
 //SYSPRINT DD SYSOUT=*
 //SYSUT2   DD DSN={helplib},DISP=SHR
 //SYSUT1   DD *"""
@@ -346,7 +843,8 @@ def emit_help():
     if not members:
         return
     sys.stderr.write("[gen] help members: {}\n".format(", ".join(members)))
-    emit_text(HELP_HEADER.format(helplib=args.helplib))
+    (emit_guarded_text if args.upgrade else emit_text)(
+        HELP_HEADER.format(helplib=args.helplib))
     for m in members:
         emit("./ ADD NAME={}".format(m))
         with open(os.path.join(help_dir, m)) as f:
@@ -371,25 +869,85 @@ def emit_tools():
         sys.exit("generate_release.py: XMIT is not FB80 (len {} not a multiple of 80).".format(len(xmit)))
     dlm = pick_dlm(xmit)
     sys.stderr.write("[gen] embedding {} ({} bytes, DLM={})\n".format(xmit_path, len(xmit), dlm))
-    emit_text(TOOLS_HEADER.format(cmdlib=args.cmdlib, vol=args.volume, dlm=dlm))
+    (emit_guarded_text if args.upgrade else emit_text)(
+        TOOLS_HEADER.format(cmdlib=args.cmdlib, vol=args.volume, dlm=dlm))
     OUT.extend(xmit)          # raw binary, already 80-byte card images
     emit(dlm)                 # delimiter card closes the DD DATA
     recv = TOOLS_RECV_370 if args.recv370 else TOOLS_RECV_TSO
     sys.stderr.write("[gen] unXMIT step: {}\n".format("RECV370" if args.recv370 else "TSO RECEIVE"))
-    emit_text(recv.format(cmdlib=args.cmdlib, vol=args.volume))
-    emit_text(TOOLS_INSTALL.format(cmdlib=args.cmdlib))
-    emit_help()
+    (emit_guarded_text if args.upgrade else emit_text)(
+        recv.format(cmdlib=args.cmdlib, vol=args.volume))
+    (emit_guarded_text if args.upgrade else emit_text)(
+        TOOLS_INSTALL.format(cmdlib=args.cmdlib))
+
+
+# ------------------------------------------------------------------ #
+#  Standalone shadow-file recovery mode.                              #
+# ------------------------------------------------------------------ #
+def write_output():
+    """Write the accumulated EBCDIC card-image stream."""
+    if args.output:
+        with open(args.output, 'wb') as f:
+            f.write(bytes(OUT))
+        sys.stderr.write("[gen] wrote {} ({} bytes). Submit via the EBCDIC reader:\n"
+                         "      cat {} | ncat --send-only -w1 127.0.0.1 3506\n"
+                         .format(args.output, len(OUT), args.output))
+    else:
+        sys.stdout.buffer.write(bytes(OUT))
+        sys.stderr.write("[gen] wrote {} bytes to stdout. Submit the EBCDIC stream via port 3506.\n"
+                         .format(len(OUT)))
+
+
+def emit_shadow_recovery(shadow):
+    """Emit a self-contained job to recreate and populate the shadow file.
+
+    This intentionally does not touch the RAKF USERS member or any load module.
+    By default it stops after loading the dataset; use --run-rakfuser only when
+    the installed RAKFUSER procedure is known to be runnable in the current
+    system. Otherwise an IPL/reload can rebuild the in-core user table later.
+    """
+    dsn = args.shadow_dsn.upper()
+    emit("//RAKFSHAD JOB (RAKF),'RAKF SHADOW RECOVERY',CLASS=A,MSGCLASS=A,")
+    emit("//         MSGLEVEL=(1,1),REGION=4096K,USER=HERC01,PASSWORD=CUL8TR")
+    emit("//* Recreate the RAKF V2 password shadow file")
+    emit("//DELETE   EXEC PGM=IDCAMS")
+    emit("//SYSPRINT DD SYSOUT=*")
+    emit("//SYSIN    DD *")
+    emit("  DELETE {} PURGE".format(dsn))
+    emit("  SET MAXCC=0")
+    emit("/*")
+    emit("//ALLOC    EXEC PGM=IEFBR14")
+    emit("//SHADOW   DD DSN={},DISP=(NEW,CATLG,DELETE),".format(dsn))
+    emit("//             UNIT=SYSDA,")
+    if args.shadow_volume:
+        emit("//             VOL=SER={},".format(args.shadow_volume.upper()))
+    emit("//             SPACE=(TRK,(1,1)),")
+    emit("//             DCB=(DSORG=PS,RECFM=FB,LRECL=48,BLKSIZE=19008)")
+    emit_shadow_load(shadow, dsn=dsn)
+    if args.run_rakfuser:
+        emit("//* Reload the in-core RAKF user table from USERS + SHADOW")
+        emit("//RELOAD   EXEC RAKFUSER")
+
+
+if args.shadow_recovery:
+    users_path = _data_file(args.users, 'users.txt')
+    with open(users_path) as f:
+        recovery_users = f.read()
+    _, recovery_shadow = build_credentials(recovery_users)
+    if not recovery_shadow:
+        sys.exit("generate_release.py: no userid/password records found in {}"
+                 .format(users_path))
+    sys.stderr.write("[gen] shadow recovery from {}: {} user(s)\n"
+                     .format(users_path, len(recovery_shadow) // 48))
+    emit_shadow_recovery(recovery_shadow)
+    write_output()
+    sys.exit(0)
 
 
 ##################################################
 
-with open(running_folder + "/TEMPLATES/01_header.template", 'r') as f:
-    for l in f.readlines():
-        emit(l.rstrip())
-        check_step(l, "01_header.template")
-
-with open(running_folder + "/JCLIN/TRKF200.jcl") as f:
-    emit_text(f.read().rstrip())
+emit_header(running_folder + "/TEMPLATES/01_header.template")
+emit_trkf200_jclin(running_folder + "/JCLIN/TRKF200.jcl")
 
 smp_dict = {
         'MACLIB': "++MAC({}) DISTLIB(AMACLIB)  SYSLIB(MACLIB).",
@@ -408,27 +966,27 @@ for folder in folders:
         with open(jfile, 'r') as f:
             emit_text(f.read().rstrip())
 
-with open(running_folder + "/TEMPLATES/02_smp4.template", 'r') as f:
-    for l in f.readlines():
-        emit(l.rstrip())
-        check_step(l, "02_smp4.template")
+emit_smp_tail(running_folder + "/TEMPLATES/02_smp4.template")
 
-install = [
-    'USERMODS/RAK0001.jcl',
-    'USERMODS/ZJW0003.jcl',
-    # ZJW0004 MACUPDs SGIEE0MS to add the //RAKFSHAD DD to MSTJCL00, which is
-    # how RAKFUSER reaches SYS1.SECURE.SHADOW at IPL. It declares
-    # PRE(ZJW0003), so it must stay after ZJW0003 or SMP/E rejects the APPLY.
-    # Without it the OPEN fails with 'IEC130I RAKFSHAD DD STATEMENT MISSING',
-    # no hashes load, and -- since build_credentials() blanks the USERS
-    # password column -- every credential on the system becomes unverifiable.
-    'USERMODS/ZJW0004.jcl',
+install = []
+
+# These USERMODs are part of the normal/fresh RAKF installation, but the
+# old TRKF126 installation already has them.  Do not RECEIVE/APPLY them
+# again during an upgrade. ZJW0003 now includes the //RAKFSHAD DD on
+# MSTJCL00, so a separate usermod is not needed for the shadow file.
+if not args.upgrade:
+    install.extend([
+        'USERMODS/RAK0001.jcl',
+        'USERMODS/ZJW0003.jcl',
+    ])
+
+install.extend([
     'TOOLS/RAKFCUST.jcl',
     'AUX/VTOC/vtoc.jcl',
     'AUX/CDSCB.jcl',
     'TOOLS/VSAMSRAC.jcl',
     'TOOLS/VTOCSRAC.jcl',
-]
+])
 
 # ---- process the initial users: blank passwords, build the shadow --
 _users_raw = open(_data_file(args.users, 'users.txt')).read()
@@ -438,6 +996,16 @@ blanked_users, shadow_bytes = build_credentials(_users_raw)
 for jcl in install:
     path = running_folder + "/" + jcl
     if 'RAKFCUST' in jcl:
+        if args.upgrade:
+            # RAKF 1.x has no shadow file. Delete any leftover from a partial
+            # V2 attempt so RAKFCUST can allocate a clean FB48 dataset and
+            # SHADLOAD cannot leave stale trailing records on a retry.
+            emit_guarded_text("""//SHADDEL  EXEC PGM=IDCAMS
+//SYSPRINT DD SYSOUT=*
+//SYSIN    DD *
+  DELETE SYS1.SECURE.SHADOW PURGE
+  SET MAXCC=0
+/*""")
         emit_rakfcust(path, [blanked_users, _profiles])
         # The shadow load and the tools install belong HERE -- after
         # RAKFCUST's ALLOC step has created SYS1.SECURE.SHADOW, and before
@@ -454,8 +1022,11 @@ for jcl in install:
         emit_shadow_load(shadow_bytes)
         if not args.no_tools:
             emit_tools()
+        emit_help()
+    elif 'VTOCSRAC' in jcl:
+        emit_vtocsrac(path, guard_apply=args.upgrade)
     else:
-        read_file(path)
+        read_file(path, guard_apply=args.upgrade)
 
 emit("//* Steps in this job stream")
 for i in steps:
@@ -464,12 +1035,4 @@ for i in steps:
 # ------------------------------------------------------------------ #
 #  Write the EBCDIC byte stream.                                     #
 # ------------------------------------------------------------------ #
-if args.output:
-    with open(args.output, 'wb') as f:
-        f.write(bytes(OUT))
-    sys.stderr.write("[gen] wrote {} ({} bytes). Submit via the EBCDIC reader:\n"
-                     "      cat {} | ncat --send-only -w1 127.0.0.1 3506\n"
-                     .format(args.output, len(OUT), args.output))
-else:
-    sys.stdout.buffer.write(bytes(OUT))
-    sys.stderr.write("[gen] wrote {} bytes to stdout. Submit the EBCDIC stream via port 3506.\n".format(len(OUT)))
+write_output()

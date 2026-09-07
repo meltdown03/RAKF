@@ -1,34 +1,67 @@
-DASDVOL *                                                   READ
-DASDVOL *                                           ADMIN   ALTER
-DASDVOL *                                           STCGROUPALTER
-DATASET *                                                   READ
-DATASET *                                           ADMIN   ALTER
-DATASET *                                           STCGROUPALTER
-DATASET RPF.V1R5M3.SRPFPROF                                 UPDATE
-DATASET SYS1.BRODCAST                                       UPDATE
-DATASET SYS1.DUPLEX                                         NONE
-DATASET SYS1.PAGECSA                                        NONE
-DATASET SYS1.PAGELPA                                        NONE
-DATASET SYS1.PAGEL01                                        NONE
-DATASET SYS1.PAGEL02                                        NONE
-DATASET SYS1.PAGES01                                        NONE
-DATASET SYS1.SECURE.*                                       NONE
-DATASET SYS1.SECURE.*                               ADMIN   NONE
-DATASET SYS1.SECURE.*                               RAKFADM UPDATE
-DATASET SYS1.STGINDEX                                       NONE
-DATASET UCPUB000                                            UPDATE
-DATASET UCPUB001                                            UPDATE
-FACILITYDIAG8                                               NONE
-FACILITYDIAG8                                       ADMIN   READ
-FACILITYDIAG8                                       STCGROUPREAD
-FACILITYRAKFADM                                             NONE
-FACILITYRAKFADM                                     ADMIN   NONE
-FACILITYRAKFADM                                     RAKFADM READ
-FACILITYRAKFADM                                     STCGROUPREAD
-FACILITYSVC244                                              NONE
-FACILITYSVC244                                      ADMIN   READ
-FACILITYSVC244                                      STCGROUPREAD
-TAPEVOL *                                                   READ
-TAPEVOL *                                           ADMIN   ALTER
-TAPEVOL *                                           STCGROUPALTER
-TERMINAL*                                                   READ
+DASDVOL *                                                   READ        00001000
+DASDVOL *                                           ADMIN   ALTER       00001100
+DASDVOL *                                           STCGROUPALTER       00001200
+DATASET *                                                   READ        00001700
+DATASET *                                           ADMIN   ALTER       00001800
+DATASET *                                           STCGROUPALTER       00001900
+DATASET IPCS.DATA.SET.DIRECTRY                              UPDATE      00002400
+DATASET IPCS.PROBLEM.DIRECTRY                               UPDATE      00002500
+DATASET RPFPROF.CLUSTER                                     UPDATE      00002904
+DATASET SYS1.BRODCAST                                       UPDATE      00003200
+DATASET SYS1.MCAT.*                                         READ        00003817
+DATASET SYS1.MCAT.*                                 ADMIN   UPDATE      00003917
+DATASET SYS1.MCAT.*                                 RAKFADM UPDATE      00004017
+DATASET SYS1.PAGE.*                                         NONE        00004518
+DATASET SYS1.SECURE.*                                       NONE        00005100
+DATASET SYS1.SECURE.*                               ADMIN   NONE        00005200
+DATASET SYS1.SECURE.*                               RAKFADM ALTER       00005300
+DATASET SYS1.STGINDEX                                       NONE        00005700
+DATASET SYS1.UCAT.TK5                                       UPDATE      00006216
+DATASET SYS1.UCAT.TSO                                       UPDATE      00006310
+DATASET TK5MIG.*                                            READ        00006719
+DATASET TK5MIG.*                                    ADMIN   UPDATE      00006819
+DATASET TK5MIG.*                                    RAKFADM UPDATE      00006918
+FACILITY$TSTVS                                              NONE        00007403
+FACILITY$TSTVS                                      ADMIN   READ        00007503
+FACILITY$TSTVS                                      STCGROUPREAD        00007603
+FACILITYDDTAPFAUTH                                          NONE        00008100
+FACILITYDDTAPFAUTH                                  ADMIN   READ        00008200
+FACILITYDDTAPFAUTH                                  STCGROUPREAD        00008300
+FACILITYDIAG8CMD                                            NONE        00008800
+FACILITYDIAG8CMD                                    ADMIN   READ        00008900
+FACILITYDIAG8CMD                                    STCGROUPREAD        00009000
+FACILITYDSSAUTH                                             NONE        00009500
+FACILITYDSSAUTH                                     ADMIN   READ        00009600
+FACILITYDSSAUTH                                     STCGROUPREAD        00009700
+FACILITYETPSAUTH                                            NONE        00010200
+FACILITYETPSAUTH                                    ADMIN   READ        00010300
+FACILITYETPSAUTH                                    STCGROUPREAD        00010400
+FACILITYFTPAUTH                                             NONE        00011113
+FACILITYFTPAUTH                                     ADMIN   READ        00011213
+FACILITYJRPAUTH                                             NONE        00011400
+FACILITYJRPAUTH                                     ADMIN   READ        00011500
+FACILITYJRPAUTH                                     STCGROUPREAD        00011600
+FACILITYNONQAUTH                                            NONE        00012100
+FACILITYNONQAUTH                                    ADMIN   READ        00012200
+FACILITYNONQAUTH                                    STCGROUPREAD        00012300
+FACILITYPGMAUTH                                             NONE        00012800
+FACILITYPGMAUTH                                     ADMIN   READ        00012900
+FACILITYPGMAUTH                                     STCGROUPREAD        00013000
+FACILITYRAKFADM                                             NONE        00013600
+FACILITYRAKFADM                                     ADMIN   NONE        00013700
+FACILITYRAKFADM                                     RAKFADM READ        00013800
+FACILITYRAKFADM                                     STCGROUPREAD        00013900
+FACILITYSHOWAUTH                                            NONE        00014400
+FACILITYSHOWAUTH                                    ADMIN   READ        00014500
+FACILITYSHOWAUTH                                    STCGROUPREAD        00014600
+FACILITYSTEPAUTH                                            NONE        00015100
+FACILITYSTEPAUTH                                    ADMIN   READ        00015200
+FACILITYSTEPAUTH                                    STCGROUPREAD        00015300
+FACILITYSVC244                                              NONE        00015800
+FACILITYSVC244                                      ADMIN   READ        00015900
+FACILITYSVC244                                      FTPD    READ        00016013
+FACILITYSVC244                                      STCGROUPREAD        00016100
+TAPEVOL *                                                   READ        00016600
+TAPEVOL *                                           ADMIN   ALTER       00016700
+TAPEVOL *                                           STCGROUPALTER       00016800
+TERMINAL*                                                   READ        00017200

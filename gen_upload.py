@@ -56,14 +56,14 @@ JOB_CLASS    = "A"
 MSGLEVEL     = "(1,1)"
 
 DEFAULT_HLQ      = "RAKF"          # high-level qualifier for all target datasets
-STEPLIB_DSN      = "SYSC.LINKLIB"  # PDS containing the PDSLOAD load module
+STEPLIB_DSN      = "SYS2.LINKLIB"  # PDS containing the PDSLOAD load module
 DLM              = "@@"            # DD DATA inline delimiter (must not appear in source)
 LRECL            = 80
 
-DEFAULT_USERID   = "IBMUSER"
-DEFAULT_PASSWORD = "SYS1"
+DEFAULT_USERID   = "HERC01"
+DEFAULT_PASSWORD = "CUL8TR"
 CARD_HOST        = "localhost"
-CARD_PORT        = 3505
+CARD_PORT        = 3515
 
 # Subdirectories to skip during auto-discovery (not PDS-style libraries)
 SKIP_DIRS = frozenset({"TEMPLATES", "AUX", "JCLIN", "USERMODS", "TOOLS"})
@@ -95,12 +95,22 @@ MODULES = [
     Module("RAKFUSER", ["RAKFUSER", "RAKFPSAV"],           ["ASMUSER", "ASMPSAV"],  "CJYRUIDS", "SYS1.LINKLIB", "MAP,LIST,LET,NCAL,AC=1"),
     Module("RAKFPROF", ["RAKFPROF"],                       ["ASMPROF"],             "CJYRPROF", "SYS1.LINKLIB", "MAP,LIST,LET,NCAL,AC=1"),
     Module("RAKFPWUP", ["RAKFPWUP"],                       ["ASMPWUP"],             "RAKFPWUP", "SYS1.LINKLIB", "MAP,LIST,LET,NCAL,AC=1"),
-    Module("ICHSFR00", ["ICHSFR00"],                       ["ASMSFR"],              "ICHSFR00", "SYS1.LPALIB",  "MAP,LIST,NCAL,LET,RENT,REFR,REUS,AC=1"),
+    Module(
+    "ICHSFR00",
+    ["ICHSFR00", "RAKFHASH", "RAKFPWH"],
+    ["ASMSFR", "ASMHASH", "ASMPWH"],
+    "ICHSFR00",
+    "SYS1.LPALIB",
+    "MAP,LIST,NCAL,RENT,REFR,REUS,AC=1",
+    ),
     Module("ICHRIN00", ["ICHRIN00", "IGC00130", "IGC0013A", "IGC0013C"],
                        ["ASMRIN",  "ASM130",   "ASM13A",   "ASM13C"],
                        "ICHRIN00", "SYS1.LPALIB",  "MAP,LIST,NCAL,LET,RENT,REFR,REUS,AC=1",
                        aliases=["IGC0013{", "IGC0013A", "IGC0013B", "IGC0013C"]),
     Module("RACIND",   ["RACIND"],                         ["ASMIND"],              "RACIND",   "SYS1.LINKLIB", "MAP,LIST,LET,NCAL,AC=1"),
+    Module("ADDUSER",  ["ADDUSER", "RAKFPWH", "RAKFHASH"], ["ASMADD", "ASMPWHA", "ASMHASHA"], "ADDUSER", "SYS2.CMDLIB", "MAP,LIST,LET,NCAL,AC=1"),
+    Module("ALTUSER",  ["ALTUSER", "RAKFPWH", "RAKFHASH"], ["ASMALT", "ASMPWHB", "ASMHASHB"], "ALTUSER", "SYS2.CMDLIB", "MAP,LIST,LET,NCAL,AC=1"),
+    Module("DELUSER",  ["DELUSER"],                        ["ASMDEL"],              "DELUSER",  "SYS2.CMDLIB",  "MAP,LIST,LET,NCAL,AC=1"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -398,6 +408,7 @@ def build_steps(modules: list, hlq: str) -> list:
     all_steps: list[list] = []
     obj_syspunch_indices: list[tuple[int, int]] = []  # (step_idx, line_idx)
     obj_created = False
+    assembled_sources = set()
 
     for mod in modules:
         out += [
@@ -408,6 +419,9 @@ def build_steps(modules: list, hlq: str) -> list:
 
         # --- Assembly step(s) ---
         for src, step_name in zip(mod.sources, mod.asm_steps):
+            if src in assembled_sources:
+                continue
+
             if obj_created:
                 obj_disp = f"DISP=(OLD,PASS),DSN=&&OBJ({src}),UNIT=SYSALLDA"
             else:
@@ -429,6 +443,7 @@ def build_steps(modules: list, hlq: str) -> list:
             syspunch_idx = 5   # index of the SYSPUNCH line within `step`
             obj_syspunch_indices.append((len(all_steps), syspunch_idx))
             all_steps.append(step)
+            assembled_sources.add(src)
 
         # --- Link step ---
         link_step = [

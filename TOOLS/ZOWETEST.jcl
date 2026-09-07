@@ -1,7 +1,7 @@
 //RAKFTST  JOB (TSO),'TEST ADDUSER',
 //             CLASS=A,
 //             MSGCLASS=A,
-//             MSGLEVEL=(1,1),USER=IBMUSER,PASSWORD=SYS1
+//             MSGLEVEL=(1,1),USER=HERC01,PASSWORD=CUL8TR
 //* Which of libc370's three startup opens is failing?
 //*
 //* @@start.c does this before main() ever runs:
@@ -15,7 +15,7 @@
 //* falls back to allocating a SYSOUT dataset (SVC 99) when it does
 //* not. Supplying the DDs therefore keeps startup away from SVC 99.
 //*
-//* IBMUSER already exists, so ADDUSER reads and then stops with
+//* HERC01 already exists, so ADDUSER reads and then stops with
 //* "already defined" RC=8 -- it never writes anything.
 //*
 //* --- 1. DDs supplied: startup never reaches SVC 99 ----------------
@@ -26,10 +26,10 @@
 //SYSTSPRT DD SYSOUT=*
 //SYSTSIN  DD *
   CALL 'SYS2.CMDLIB(ADDUSER)' +
-'IBMUSER PASSWORD(TEST) DFLTGRP(ADMIN) -TRACE'
+'HERC01 PASSWORD(TEST) DFLTGRP(ADMIN) -TRACE'
 //* --- 2. no DDs: startup falls back to SVC 99 (the failing case) ---
 //NODD    EXEC PGM=IKJEFT01,REGION=4096K
 //SYSTSPRT DD SYSOUT=*
 //SYSTSIN  DD *
   CALL 'SYS2.CMDLIB(ADDUSER)' +
-'IBMUSER PASSWORD(TEST) DFLTGRP(ADMIN) -TRACE'
+'HERC01 PASSWORD(TEST) DFLTGRP(ADMIN) -TRACE'

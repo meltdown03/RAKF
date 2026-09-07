@@ -23,7 +23,7 @@ cat << 'END'
 //             HELP='SYS2.HELP',       <=== HELP LIBRARY
 //             SYSTS=SYSDA,            <=== UNITNAME FOR WORK DATASETS
 //             ASMBLR=IFOX00,          <=== NAME OF YOUR ASSEMBLER
-//             ALIB='SYSC.LINKLIB',    <=== LOCATION OF YOUR ASSEMBLER
+//             ALIB='SYS2.LINKLIB',    <=== LOCATION OF YOUR ASSEMBLER
 //             MACLIB='SYS1.MACLIB',   <=== MACLIB DATASET NAME
 //             AMODGEN='SYS1.AMODGEN'  <=== AMODGEN DATASET NAME
 //*

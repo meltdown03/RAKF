@@ -1,5 +1,5 @@
 //RAKFUDMP JOB (TSO),'RAKF User Dump',CLASS=A,MSGCLASS=A,
-//             REGION=8192K,MSGLEVEL=(1,1),USER=IBMUSER,PASSWORD=SYS1
+//             REGION=8192K,MSGLEVEL=(1,1),USER=HERC01,PASSWORD=CUL8TR
 //*
 //* RAKFUDMP - Dump RAKF in-memory user table with decoded passwords
 //*
@@ -63,7 +63,7 @@ SAY '*  RAKFUDMP - RAKF IN-MEMORY USER TABLE DUMP'
 SAY COPIES('*', 60)
 SAY ''
 cvt  = RD4('00000000', PSA_CVT)
-SAY 'CVT      @ X''' || cvt || ''''
+SAY 'CVT      @ X'''cvt''''
  /* CVT+X'F8'=CVTSAF=SAFV in RAKF/MVS 3.8J (not CVTRAC).    */
  /* Scan CVT at 4-byte intervals to find the RCVT pointer.   */
 rcvt = ''
@@ -75,7 +75,7 @@ DO off = 4 TO 1020 BY 4
   IF X2D(ptr) < X2D('00E00000') THEN ITERATE
   IF X2D(ptr) > X2D('00FFFFFF') THEN ITERATE
   IF STORAGE(ptr, 4) = 'RCVT' THEN DO
-    SAY 'RCVT     @ X''' || ptr || ''' (CVT+X''' || D2X(off) || ''')'
+    SAY 'RCVT     @ X'''ptr''' (CVT+X'''D2X(off)''')'
     rcvt = ptr
     LEAVE
   END
@@ -92,8 +92,8 @@ IF istl = '00000000' THEN DO
   EXIT 8
 END
 head = RD4(istl, 0)
-SAY 'CJYRCVTD @ X''' || istl || ''''
-SAY 'CBLK HEAD @ X''' || head || ''''
+SAY 'CJYRCVTD @ X'''istl''''
+SAY 'CBLK HEAD @ X'''head''''
 SAY ''
 IF head = '00000000' THEN DO
   SAY 'User table is empty or RAKF not fully initialized.'
@@ -122,7 +122,7 @@ DO WHILE cblk <> '00000000'
     cg   = STORAGE(gptr, CONN_LEN)
     cgl  = C2D(SUBSTR(cg, CONN_GRPL+1, 1))
     cgn  = LEFT(SUBSTR(cg, CONN_GRPN+1, 8), cgl)
-    grps = grps || ' ' || cgn
+    grps = grps ' ' cgn
     gptr = C2X(SUBSTR(cg, CONN_NEXT+1, 4))
   END
   SAY LEFT(user,8) LEFT(dfgp,9) LEFT(pwdp,9) oper '  ' STRIP(grps)
@@ -138,7 +138,7 @@ RD4: PROCEDURE
 /*
 //RUN      EXEC PGM=BREXX,PARM='RXRUN',REGION=8192K
 //RXRUN    DD   DSN=&&RXPGM,DISP=SHR
-//RXLIB    DD   DSN=BREXX.CURRENT.RXLIB,DISP=SHR
+//RXLIB    DD   DSN=BREXX.V2R5M3.RXLIB,DISP=SHR
 //STDIN    DD   DUMMY
 //STDOUT   DD   SYSOUT=*,DCB=(RECFM=FB,LRECL=133,BLKSIZE=5320)
 //STDERR   DD   SYSOUT=*,DCB=(RECFM=FB,LRECL=133,BLKSIZE=5320)

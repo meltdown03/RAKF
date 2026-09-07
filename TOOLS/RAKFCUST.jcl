@@ -66,13 +66,13 @@ TERMINAL*                                                   READ
 /*
 //* ******************************************************************
 //ALLOC   EXEC PGM=IEFBR14
-//PWUP     DD  DISP=(,CATLG),DSN=SYS1.SECURE.PWUP,VOL=SER=MVS000,
+//PWUP     DD  DISP=(,CATLG),DSN=SYS1.SECURE.PWUP,VOL=SER=TK5CAT,
 //             UNIT=SYSDA,DCB=(RECFM=F,LRECL=18,BLKSIZE=18),
 //             SPACE=(TRK,(1,1))
-//RAKF    DD DISP=(,CATLG),DSN=SYS1.SECURE.CNTL,VOL=SER=MVS000,
+//RAKF    DD DISP=(,CATLG),DSN=SYS1.SECURE.CNTL,VOL=SER=TK5CAT,
 //           UNIT=SYSDA,DCB=(RECFM=FB,LRECL=80,BLKSIZE=19040),
 //           SPACE=(TRK,(10,3,3))
-//SHADOW  DD DISP=(,CATLG),DSN=SYS1.SECURE.SHADOW,VOL=SER=MVS000,
+//SHADOW  DD DISP=(,CATLG),DSN=SYS1.SECURE.SHADOW,VOL=SER=TK5CAT,
 //           UNIT=SYSDA,DCB=(RECFM=FB,LRECL=48,BLKSIZE=19008),
 //           SPACE=(TRK,(5,3))
 //********************************************************************
@@ -149,7 +149,7 @@ SAY ''
 //* **********************************************************
 //EXECSORT EXEC PGM=BREXX,PARM='RXRUN',REGION=8192K
 //RXRUN    DD   DSN=&&RXSORT,DISP=SHR
-//RXLIB    DD   DSN=BREXX.CURRENT.RXLIB,DISP=SHR
+//RXLIB    DD   DSN=BREXX.V2R5M3.RXLIB,DISP=SHR
 //STDIN    DD   DUMMY
 //USERS    DD   DSN=&&USERS,DISP=SHR
 //PROFILES DD   DSN=&&PROF,DISP=SHR
@@ -165,7 +165,7 @@ SAY ''
 //SYSUT2   DD SYSOUT=*
 //* **********************************************************
 //RAKFCNTL EXEC PGM=PDSLOAD
-//STEPLIB  DD  DSN=SYSC.LINKLIB,DISP=SHR
+//STEPLIB  DD  DSN=SYS2.LINKLIB,DISP=SHR
 //SYSPRINT DD  SYSOUT=*
 //SYSUT2   DD  DISP=SHR,DSN=SYS1.SECURE.CNTL
 //SYSUT1   DD  DSN=&&STAGIN,DISP=SHR
