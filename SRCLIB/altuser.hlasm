@@ -526,9 +526,9 @@ $DFPRES  EQU   128                     Default group is present         00052400
 *                                                                       00052600
 USERREC  DSECT                         User record                      00052700
 USERUID  DS    CL8                     Contains UserID                  00052800
-USERDFT  DS    C                       * for default group              00052900
-USERGRP  DS    CL8                     Group                            00053000
          DS    C                                                        00053100
+USERGRP  DS    CL8                     Group                            00053000
+USERDFT  DS    C                       * for default group              00052900
 USERPWD  DS    CL8                     Password is blanked out          00053200
          DS    C                                                        00053300
 USEROPR  DS    C                       Operations / Nooperations        00053400
