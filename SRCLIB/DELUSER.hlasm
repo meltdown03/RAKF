@@ -189,9 +189,11 @@ DELU009  DS    0H                                                       00017700
          BAL   R14,CLOSE               Close RAKFUSER and RAKFSHAD      00018900
          BAL   R14,FREE                Free the data sets               00019000
          B     RC08                    Return code 8                    00019100
-DELU010  OI    SW,$DEL                 Mark User deleted                00019200
+DELU010  OI    SW,$DELU                Mark User deleted from USERS     00019200
          B     DELU009                 Read next record                 00019300
 USEREOF  DS    0H                      EOF RACFUSER                     00019400
+         TM    SW,$DELU                Is a user deleted from USERS?    00019401
+         BZ    DELU013                 No: no sense to write table back 00019402
          L     R6,ADRUSER              Point to start of table          00019500
          MVI   CLOSED,X'80'            First and only DCB               00019600
          CLOSE RAKFUSER,MF=(E,CLOSED)                                   00019700
@@ -224,9 +226,11 @@ DELU015  DS    0H                                                       00021900
          LA    R5,1(,R5)               Count record in table            00022400
          LA    R6,48(,R6)              Next entry in table              00022500
          B     DELU015                 Read next record                 00022600
-DELU016  OI    SW,$DEL                 Mark User deleted                00022700
+DELU016  OI    SW,$DELS                Mark User deleted from SHADOW    00022700
          B     DELU015                 Read next record                 00022800
 SHADEOF  DS    0H                      EOF RACFSHAD                     00022900
+         TM    SW,$DELS                Is a user deleted from SAHADOW?  00022901
+         BZ    DELU021                 No: no sense to write table back 00022902
          L     R6,ADRUSER              Start of user table              00023000
          MVI   CLOSED,X'80'            First and only DCB               00023100
          CLOSE RAKFSHAD,MF=(E,CLOSED)                                   00023200
@@ -263,7 +267,7 @@ RETURN   DS    0H                                                       00026000
          FREEMAIN RU,LV=(2),A=(3)      Free the PPL                     00026300
          L     R2,ADRUSER              Address of user table            00026400
          FREEMAIN RU,LV=104000,A=(2)                                    00026500
-         TM    SW,$DEL                 Anything deleted?                00026600
+         TM    SW,$DELU+$DELS          Anything deleted?                00026600
          BNZ   RETURN2                 Yes: carry on                    00026700
          LA    R1,MSG4                 Msg: 'nothing deleted'           00026800
          LA    R0,L'MSG4               Length                           00026900
@@ -445,7 +449,8 @@ MSG3     DS    CL(L'MSG3X)                                              00044400
 MSG6     DS    CL(L'MSG6X)                                              00044500
 SW       DS    X                       Flags                            00044600
 $913     EQU   128                     913 abend occurred               00044700
-$DEL     EQU   64                      User is deleted                  00044800
+$DELU    EQU   64                      User is deleted from USERS       00044800
+$DELS    EQU   32                      User is deleted from SHADOW      00044801                 
 *                                                                       00044900
 WORKL    EQU   *-WORKAREA              Length of working storage        00045000
 *                                                                       00045100
