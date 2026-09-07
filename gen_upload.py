@@ -453,7 +453,7 @@ def build_steps(modules: list, hlq: str) -> list:
 
         # --- Link step ---
         link_step = [
-            f"//{mod.name:<8} EXEC PGM=IEWL,COND=(0,NE),",
+            f"//{mod.name:<8} EXEC PGM=IEWL,COND=(4,LT),",
             f"//  PARM='{mod.link_parm}'",
             f"//SYSPRINT DD  SYSOUT=*",
             f"//SYSLMOD  DD  DISP=SHR,DSN={mod.target}",
