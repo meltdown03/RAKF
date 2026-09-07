@@ -319,7 +319,7 @@ reaches the system, and no chicken-and-egg with the tools below: the initial
 credentials exist before `ADDUSER`/`ALTUSER` are ever run. (This means
 `users.txt` itself contains live credentials — keep it protected off-system.)
 
-### Managing Users with ADDUSER and ALTUSER
+### Managing Users with ADDUSER, ALTUSER and DELUSER
 
 Users are created and changed with two RACF-style command processors,
 `ADDUSER` and `ALTUSER`, installed in `SYS2.CMDLIB`. They write the `USERS`
@@ -330,6 +330,8 @@ procs in `SYS1.PROCLIB`.
 ```
 ADDUSER userid PASSWORD(pw) DFLTGRP(group) [GROUP(g2 g3 ...)] [OPERATIONS] [SPECIAL]
 ALTUSER userid [PASSWORD(pw)] [DFLTGRP(group)] [OPERATIONS|NOOPERATIONS] [SPECIAL|NOSPECIAL]
+
+PASSWORD may be code as PWD, GROUP as GRP and DFLTGRP as DGRP.
 ```
 
 - **ADDUSER** adds one `USERS` line per group (the `DFLTGRP` line is flagged as
@@ -337,6 +339,7 @@ ALTUSER userid [PASSWORD(pw)] [DFLTGRP(group)] [OPERATIONS|NOOPERATIONS] [SPECIA
   record. `PASSWORD` and `DFLTGRP` are required; it fails if the user exists.
 - **ALTUSER** changes an existing user: `PASSWORD` re-hashes with a fresh salt,
   `DFLTGRP` moves the default-group flag, and the flags toggle operations/special.
+- **DELUSER** removes a user from SYS1.SECURE.SHADOW and SYS1.SECURE.CNTL(USERS).
 
 They run either as a **TSO command** (from a RAKF administrator's session)—
 
@@ -352,7 +355,7 @@ TSO continuation `+` if needed):
 //ADDUSER  EXEC PGM=IKJEFT01
 //SYSTSPRT DD  SYSOUT=*
 //SYSTSIN  DD  *
-  CALL 'SYS2.CMDLIB(ADDUSER)' +
+  ADDUSER +
 'SMITH PASSWORD(START123) DFLTGRP(USER)'
 ```
 
