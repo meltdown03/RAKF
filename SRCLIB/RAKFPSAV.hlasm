@@ -1,159 +1,226 @@
-         TITLE 'Save Password Changes in RAKF Users Table'              00010000
-RAKFPSAV CSECT                                                          00020000
-         PRINT NOGEN                                                    00030000
-*                                                                       00040000
-**********************************************************************  00050000
-*                                                                    *  00060000
-* NAME: RAKFPSAV                                                     *  00070000
-*                                                                    *  00080000
-* TYPE: Assembler Source                                             *  00090000
-*                                                                    *  00100000
-* DESC: Save Password Changes in RAKF Users Table                    *  00110000
-*                                                                    *  00120000
-* FUNCTION: - read the password change queue created by RAKFPWUP     *  00130000
-*             into memory                                            *  00140000
-*           - loop through the RAKF users table and check each line  *  00150000
-*             for a password change queue entry. If an entry exists  *  00160000
-*             update that line in place                              *  00170000
-*           - clear the password change queue                        *  00180000
-*                                                                    *  00190000
-* REQUIREMENTS: - RAKF users table pointed to by ddname RAKFUSER     *  00200000
-*               - RAKF password change queue pointed to by ddname    *  00210000
-*                 RAKFPWUP, a sequential dataset with LRECL=18,      *  00220000
-*                 RECFM=F and one line per password change in the    *  00230000
-*                 following format:                                  *  00240000
-*                                                                    *  00250000
-*                 ----+----1----+---                                 *  00260000
-*                 uuuuuuuu pppppppp                                  *  00270000
-*                                                                    *  00280000
-*                 where uuuuuuuu is the username and pppppppp is     *  00290000
-*                 the new password, each padded to the right with    *  00300000
-*                 blanks to 8 characters.                            *  00310000
-*                                                                    *  00320000
-**********************************************************************  00330000
-*                                                                       00340000
-* initialize                                                            00350000
-*                                                                       00360000
-         SAVE  (14,12),,RAKFPSAV_&SYSDATE._&SYSTIME                     00370000
-         USING RAKFPSAV,R15        establish => program EP              00380000
-         ST    R13,SAVEAREA+4      save HSA                             00390000
-         LA    R11,SAVEAREA        establish => savearea                00400000
-         ST    R11,8(R13)          save LSA                             00410000
-         LR    R13,R11             setup => our savearea                00420000
-         USING SAVEAREA,R13        new addressability                   00430000
-         DROP  R15                 program EP no longer needed          00440000
-         B     CONTINUE            branch around savearea               00450000
-SAVEAREA DS    18F                 savearea                             00460000
-*                                                                       00470000
-* first read of password change queue to determine number of changes    00480000
-*                                                                       00490000
-CONTINUE XR    R5,R5               initialize changes counter           00500000
-         XR    R6,R6               initialize changes buffer size       00510000
-         OPEN  (RAKFPWUP,(INPUT))  open password change queue           00520000
-SIZELOOP GET   RAKFPWUP,PWUP       get change record                    00530000
-         LA    R5,1(,R5)           increment changes counter            00540000
-         A     R6,CHGRECL          increment buffer size                00550000
-         B     SIZELOOP            read next change record              00560000
-ENDPWUP  CLOSE (RAKFPWUP)          close password change queue          00570000
-         LTR   R5,R5               no password changes queued?          00580000
-         BZ    RETURN               exit                                00590000
-*                                                                       00600000
-* second read of password change queue loads all changes in storage     00610000
-*                                                                       00620000
-         ST    R5,NCHANGES         remember number of changes           00630000
-         ST    R6,CHGBSIZE         remember changes buffer size         00640000
-         GETMAIN RU,LV=CHGBSIZE    get storage for changes buffer       00650000
-         ST    R1,ACHGBUF          remember changes buffer address      00660000
-         OPEN  (RAKFPWUP,(INPUT))  reopen password change queue         00670000
-         A     R6,ACHGBUF          one byte beyond change buffer        00680000
-         USING PWUP,R6             establish changes addressability     00690000
-CHGREAD  S     R6,CHGRECL          address record for backward read     00700000
-         GET   RAKFPWUP,PWUP       get change record                    00710000
-         BCT   R5,CHGREAD          read next change record              00720000
-         CLOSE (RAKFPWUP)          close password change queue          00730000
-*                                                                       00740000
-* update RAKF users table                                               00750000
-*                                                                       00760000
-         RDJFCB (RAKFUSER)         find out user table DSN for ENQ      00770000
-         MODESET MODE=SUP,KEY=ZERO authorize ourselves for SYSDSN ENQ   00780000
-         ENQ   (SYSDSN,JFCBDSNM,E,44,SYSTEM),RET=HAVE   serialization   00790000
-         ENQ   (SPFEDIT,JFCBDSNM,E,52,SYSTEMS),RET=HAVE serialization   00800000
-         MODESET MODE=PROB,KEY=NZERO return to problem state            00810000
-         OPEN  (RAKFUSER,(UPDAT))  open users table                     00820000
-         USING USERREC,R1          addressability of users table record 00830000
-USERLOOP GET   RAKFUSER            get record from users table          00840000
-         CLI   USER,C'*'           is it a comment?                     00850000
-         BE    USERLOOP             process next record                 00860000
-         L     R5,NCHANGES         get number of changes                00870000
-         L     R6,ACHGBUF          get changes buffer address           00880000
-PWDLOOP  CLC   USER(8),PWUPUSER    do we have an update?                00890000
-         BE    UPDATEPW             go process it                       00900000
-         A     R6,CHGRECL          address next entry                   00910000
-         BCT   R5,PWDLOOP          check next password change record    00920000
-         B     USERLOOP            no update found, process next user   00930000
-UPDATEPW MVC   PASSWORD(8),PWUPPSWD update password                     00940000
-         MVC   SEQNO(8),PWCHANGE   flag sequence number                 00950000
-         PUTX  RAKFUSER            update users table record in place   00960000
-         B     USERLOOP            process next user                    00970000
-ENDUSER  CLOSE (RAKFUSER)          close users table                    00980000
-         DROP  R1                  users table record no longer needed  00990000
-         MODESET MODE=SUP,KEY=ZERO authorize ourselves for SYSDSN DEQ   01000000
-         DEQ   (SPFEDIT,JFCBDSNM,52,SYSTEMS),RET=HAVE release ENQ       01010000
-         DEQ   (SYSDSN,JFCBDSNM,44,SYSTEM),RET=HAVE   release ENQ       01020000
-         MODESET MODE=PROB,KEY=NZERO return to problem state            01030000
-         OPEN  (RAKFPWUP,(OUTPUT)) clear ..                             01040000
-         CLOSE (RAKFPWUP)                 .. password change queue      01050000
-*                                                                       01060000
-* clear and free change queue buffer                                    01070000
-*                                                                       01080000
-         L     R5,NCHANGES         get number of changes                01090000
-         L     R6,ACHGBUF          get changes buffer address           01100000
-CLRLOOP  XC    PWUP(CHGLRECL),PWUP clear record                         01110000
-         A     R6,CHGRECL          address next entry                   01120000
-         BCT   R5,CLRLOOP          clear next change record             01130000
-         DROP  R6                  changes buffer no longer needed      01140000
-         FREEMAIN RU,LV=CHGBSIZE,A=ACHGBUF free changes buffer          01150000
-*                                                                       01160000
-* cleanup and return                                                    01170000
-*                                                                       01180000
-         XC    PWUP(CHGLRECL),PWUP clear local changes queue record     01190000
-RETURN   L     R13,SAVEAREA+4      get caller's savearea                01200000
-         RETURN (14,12),,RC=0      return                               01210000
-*                                                                       01220000
-* data area                                                             01230000
-*                                                                       01240000
-CHGBSIZE DS    F                   size of changes queue buffer         01250000
-ACHGBUF  DS    F                   address of changes queue buffer      01260000
-NCHANGES DS    F                   number of changes in queue           01270000
-CHGRECL  DC    A(CHGLRECL)         record length of changes queue       01280000
-PWCHANGE DC    CL8'PWCHANGE'       flag for sequence number field       01290000
-SYSDSN   DC    CL8'SYSDSN'         resource name for enqueue            01300000
-SPFEDIT  DC    CL8'SPFEDIT'        resource name for enqueue            01310000
-RAKFPWUP DCB   DDNAME=RAKFPWUP,MACRF=(GM,PM),EODAD=ENDPWUP,DSORG=PS     01320000
-RAKFUSER DCB   DDNAME=RAKFUSER,MACRF=(GL,PM),EODAD=ENDUSER,DSORG=PS,   X01330000
-               EXLST=JFCB          DCB with exit list for RDJFCB        01340000
-JFCB     DS    0F                  the exit list contains only ..       01350000
-         DC    X'87'                .. the target JFCB address ..       01360000
-         DC    AL3(INFMJFCB)        .. for RDJFCB                       01370000
-         IEFJFCBN                  RDJFCB target                        01380000
-         LTORG ,                   all literals go here                 01390000
-PWUP     DS    0C                  changes queue record                 01400000
-PWUPUSER DC    CL8' '              userid                               01410000
-         DC    C' '                filler                               01420000
-PWUPPSWD DC    CL8' '              new password                         01430000
-         DC    C' '                filler                               01440000
-CHGLRECL EQU   *-PWUP              record length of changes queue       01450000
-*                                                                       01460000
-* equates                                                               01470000
-*                                                                       01480000
-         YREGS                     register equates                     01490000
-*                                                                       01500000
-* RAKF users table                                                      01510000
-*                                                                       01520000
-USERREC  DSECT                     record from users table              01530000
-USER     DS    CL8                 user                                 01540000
-         DS    CL10                group, filler, flag                  01550000
-PASSWORD DS    CL8                 password                             01560000
-         ORG   USER+72             any other stuff                      01570000
-SEQNO    DS    CL8                 sequence number                      01580000
-         END   RAKFPSAV            end of program                       01590000
+         TITLE 'Save Password Changes in RAKF SHADOW data set'      @10 00000100
+RAKFPSAV CSECT                                                          00000200
+         PRINT NOGEN                                                    00000300
+*                                                                       00000400
+**********************************************************************  00000500
+*                                                                    *  00000600
+* NAME: RAKFPSAV                                                     *  00000700
+*                                                                    *  00000800
+* TYPE: Assembler Source                                             *  00000900
+*                                                                    *  00001000
+* DESC: Save Password Changes in RAKF SHADOW data set               @10 00001100
+*                                                                    *  00001200
+* FUNCTION: - read the password change queue created by RAKFPWUP     *  00001300
+*             into memory                                            *  00001400
+*           - loop through the RAKF SHADOW table and check each line@10 00001500
+*             for a password change queue entry. If an entry exists  *  00001600
+*             update encrypt the password with a salt + encrypted    *  00001700
+*             32 byte field.                                         *  00001800
+*           - clear the password change queue                        *  00001900
+*                                                                    *  00002000
+* REQUIREMENTS: - RAKF shadow table pointed to by ddname RAKFSHAD   @10 00002100
+*               - RAKF password change queue pointed to by ddname    *  00002200
+*                 RAKFPWUP, a sequential dataset with LRECL=18,      *  00002300
+*                 RECFM=F and one line per password change in the    *  00002400
+*                 following format:                                  *  00002500
+*                                                                    *  00002600
+*                 ----+----1----+---                                 *  00002700
+*                 uuuuuuuu pppppppp                                  *  00002800
+*                                                                    *  00002900
+*                 where uuuuuuuu is the username and pppppppp is     *  00003000
+*                 the new password, each padded to the right with    *  00003100
+*                 blanks to 8 characters.                            *  00003200
+*                                                                    *  00003300
+*    2026/09/07 @10     Update the passwords from PWUP to the       @10 00003400
+*                       shadow data set. Formerly the updated       @10 00003500
+*                       passwords were saved in the USERS           @10 00003600
+*                       table, but since the passwords are          @10 00003700
+*                       encrypted, the passwords will be saved      @10 00003800
+*                       as SHA-256(salt||password) in the           @10 00003900
+*                       SHADOW data set.                            @10 00004000
+********************************************************************@10 00004100
+*                                                                       00004200
+* initialize                                                            00004300
+*                                                                       00004400
+         SAVE  (14,12),,RAKFPSAV_&SYSDATE._&SYSTIME                     00004500
+         USING RAKFPSAV,R15        establish => program EP              00004600
+         ST    R13,SAVEAREA+4      save HSA                             00004700
+         LA    R11,SAVEAREA        establish => savearea                00004800
+         ST    R11,8(R13)          save LSA                             00004900
+         LR    R13,R11             setup => our savearea                00005000
+         USING SAVEAREA,R13        new addressability                   00005100
+         DROP  R15                 program EP no longer needed          00005200
+         B     CONTINUE            branch around savearea               00005300
+SAVEAREA DS    18F                 savearea                             00005400
+*                                                                       00005500
+* first read of password change queue to determine number of changes    00005600
+*                                                                       00005700
+CONTINUE XR    R5,R5               initialize changes counter           00005800
+         XR    R6,R6               initialize changes buffer size       00005900
+         OPEN  (RAKFPWUP,(INPUT))  open password change queue           00006000
+SIZELOOP GET   RAKFPWUP,PWUP       get change record                    00006100
+         LA    R5,1(,R5)           increment changes counter            00006200
+         A     R6,CHGRECL          increment buffer size                00006300
+         B     SIZELOOP            read next change record              00006400
+ENDPWUP  CLOSE (RAKFPWUP)          close password change queue          00006500
+         LTR   R5,R5               no password changes queued?          00006600
+         BZ    RETURN               exit                                00006700
+*                                                                       00006800
+* second read of password change queue loads all changes in storage     00006900
+*                                                                       00007000
+         ST    R5,NCHANGES         remember number of changes           00007100
+         ST    R6,CHGBSIZE         remember changes buffer size         00007200
+         GETMAIN RU,LV=CHGBSIZE    get storage for changes buffer       00007300
+         ST    R1,ACHGBUF          remember changes buffer address      00007400
+         OPEN  (RAKFPWUP,(INPUT))  reopen password change queue         00007500
+         A     R6,ACHGBUF          one byte beyond change buffer        00007600
+         USING PWUP,R6             establish changes addressability     00007700
+CHGREAD  S     R6,CHGRECL          address record for backward read     00007800
+         GET   RAKFPWUP,PWUP       get change record                    00007900
+         BCT   R5,CHGREAD          read next change record              00008000
+         CLOSE (RAKFPWUP)          close password change queue          00008100
+*                                                                       00008200
+* update RAKF SHADOW data set                                           00008300
+*                                                                       00008400
+         RDJFCB (RAKFSHAD)         find out user table DSN for ENQ  @10 00008500
+         MODESET MODE=SUP,KEY=ZERO authorize ourselves for SYSDSN ENQ   00008600
+         ENQ   (SYSDSN,JFCBDSNM,E,44,SYSTEM),RET=HAVE   serialization   00008700
+         ENQ   (SPFEDIT,JFCBDSNM,E,52,SYSTEMS),RET=HAVE serialization   00008800
+         MODESET MODE=PROB,KEY=NZERO return to problem state            00008900
+         OPEN  (RAKFSHAD,(UPDAT))  open SHADOW data set             @10 00009000
+         USING SHADOW,R3           addressability of shadow table   @10 00009100
+SHADLOOP GET   RAKFSHAD            get record from SHADOW data set  @10 00009200
+         LR    R3,R1               Save address of record           @10 00009300
+         L     R5,NCHANGES         get number of changes                00009400
+         L     R6,ACHGBUF          get changes buffer address           00009500
+PWDLOOP  CLC   USER(8),PWUPUSER    do we have an update?                00009600
+         BE    UPDATEPW             go process it                       00009700
+         A     R6,CHGRECL          address next entry                   00009800
+         BCT   R5,PWDLOOP          check next password change record    00009900
+         B     SHADLOOP            no update found, process next user   00010000
+UPDATEPW DS    0H                  TOD clock in salt                @10 00010100
+*---------------------------------------------------------------------* 00010200
+*        Initialize the Salt with the TOD clock and call RAKFPWH    @10 00010300
+*        to create  SHA256(salt||password) and store this in the    @10 00010400
+*        SHADOW data set.                                           @10 00010500
+*---------------------------------------------------------------------* 00010600
+         STCK  SALT                    Salt = the TOD clock         @10 00010700
+         MVC   WORKPASS+1,PWUPPSWD     Password from PWUP           @10 00010800
+         LA    R1,WORKPASS+1           Start of password            @10 00010900
+         LA    R0,8                    Maximum length               @10 00011000
+         XR    R2,R2                   Count password bytes         @10 00011100
+UPDPW1   CLI   0(R1),C' '              Blank found?                 @10 00011200
+         BE    UPDPW2                  Yes: we know the length      @10 00011300
+         LA    R1,1(,R1)               Next byte in password        @10 00011400
+         LA    R2,1(,R2)               Increase length              @10 00011500
+         BCT   R0,UPDPW1               Loop until all done          @10 00011600
+UPDPW2   STC   R2,WORKPASS             We need the length for hash  @10 00011700
+         LA    R0,SALT                 Salt                         @10 00011800
+         ST    R0,HWPL+0               In parmlist                  @10 00011900
+         LA    R0,WORKPASS+1                                        @10 00012000
+         ST    R0,HWPL+4               In parmlist                  @10 00012100
+         XR    R1,R1                   Clear register               @10 00012200
+         IC    R1,WORKPASS             Gotten password length       @10 00012300
+         ST    R1,HWPWLEN              Save in RAKFPWH list         @10 00012400
+         LA    R0,HWPWLEN                                           @10 00012500
+         ST    R0,HWPL+8               In parmlist                  @10 00012600
+         LA    R0,OUTPUT               Output field                 @10 00012700
+         ST    R0,HWPL+12              In parmlist                  @10 00012800
+         LA    R0,HWWORK               Work area                    @10 00012900
+         ST    R0,HWPL+16              In parmlist                  @10 00013000
+         LA    R1,HWPL                 Parmlist                     @10 00013100
+         ST    R13,HWR13               Save our area address        @10 00013200
+         LR    R4,R13                  Save our area address        @10 00013300
+         L     R15,=V(RAKFPWH)         Hashing routine              @10 00013400
+         LA    R13,HWSAVE                                           @10 00013500
+         BALR  R14,R15                 Encrypt                      @10 00013600
+         LR    R13,R4                  Restore our SA address       @10 00013700
+         PUTX  RAKFSHAD            update SHDAOW record in place    @10 00013800
+         B     SHADLOOP            Update next user if any          @10 00013900
+*                                                                   @10 00014000
+ENDSHAD  CLOSE (RAKFSHAD)          close shadow table               @10 00014100
+         DROP  R3                  users table record no longer need@10 00014200
+         MODESET MODE=SUP,KEY=ZERO authorize ourselves for SYSDSN DEQ   00014300
+         DEQ   (SPFEDIT,JFCBDSNM,52,SYSTEMS),RET=HAVE release ENQ       00014400
+         DEQ   (SYSDSN,JFCBDSNM,44,SYSTEM),RET=HAVE   release ENQ       00014500
+         MODESET MODE=PROB,KEY=NZERO return to problem state            00014600
+         OPEN  (RAKFPWUP,(OUTPUT)) clear ..                             00014700
+         CLOSE (RAKFPWUP)                 .. password change queue      00014800
+*                                                                       00014900
+* clear and free change queue buffer                                    00015000
+*                                                                       00015100
+         L     R5,NCHANGES         get number of changes                00015200
+         L     R6,ACHGBUF          get changes buffer address           00015300
+CLRLOOP  XC    PWUP(CHGLRECL),PWUP clear record                         00015400
+         A     R6,CHGRECL          address next entry                   00015500
+         BCT   R5,CLRLOOP          clear next change record             00015600
+         DROP  R6                  changes buffer no longer needed      00015700
+         FREEMAIN RU,LV=CHGBSIZE,A=ACHGBUF free changes buffer          00015800
+*                                                                       00015900
+* cleanup and return                                                    00016000
+*                                                                       00016100
+         XC    PWUP(CHGLRECL),PWUP clear local changes queue record     00016200
+RETURN   L     R13,SAVEAREA+4      get caller's savearea                00016300
+         RETURN (14,12),,RC=0      return                               00016400
+*                                                                       00016500
+* data area                                                             00016600
+*                                                                       00016700
+CHGBSIZE DS    F                   size of changes queue buffer         00016800
+ACHGBUF  DS    F                   address of changes queue buffer      00016900
+NCHANGES DS    F                   number of changes in queue           00017000
+WORKPASS DS    CL9                 Proposed length + password       @10 00017100
+CHGRECL  DC    A(CHGLRECL)         record length of changes queue       00017200
+*                                                                       00017300
+HASHWKD  DS    0CL772              Area for RAKFPWH                 @10 00017400
+HWPL     DS    5F                  parmlist (salt,pw,pwlen,out,work)@10 00017500
+HWPWLEN  DS    F                   Candidate password length        @10 00017600
+HWR13    DS    F                   saved caller save-area pointer   @10 00017700
+HWOUT    DS    CL32                computed SHA-256 hash            @10 00017800
+HWSAVE   DS    18F                 save area for the RAKFPWH call   @10 00017900
+HWWORK   DS    CL640               RAKFPWH work area (>= RPWWORKL)  @10 00018000
+*                                                                       00018100
+SYSDSN   DC    CL8'SYSDSN'         resource name for enqueue            00018200
+SPFEDIT  DC    CL8'SPFEDIT'        resource name for enqueue            00018300
+RAKFPWUP DCB   DDNAME=RAKFPWUP,MACRF=(GM,PM),EODAD=ENDPWUP,DSORG=PS     00018400
+RAKFSHAD DCB   DDNAME=RAKFSHAD,MACRF=(GL,PM),EODAD=ENDSHAD,DSORG=PS,   X00018500
+               EXLST=JFCB          DCB with exit list for RDJFCB        00018600
+JFCB     DS    0F                  the exit list contains only ..       00018700
+         DC    X'87'                .. the target JFCB address ..       00018800
+         DC    AL3(INFMJFCB)        .. for RDJFCB                       00018900
+         IEFJFCBN                  RDJFCB target                        00019000
+         LTORG ,                   all literals go here                 00019100
+PWUP     DS    0C                  changes queue record                 00019200
+PWUPUSER DC    CL8' '              userid                               00019300
+         DC    C' '                filler                               00019400
+PWUPPSWD DC    CL8' '              new password                         00019500
+         DC    C' '                filler                               00019600
+CHGLRECL EQU   *-PWUP              record length of changes queue       00019700
+*                                                                       00019800
+* equates                                                               00019900
+*                                                                       00020000
+*                                                                       00020100
+*                                                                       00020200
+* RAKF SHADOW entry                                                 @10 00020300
+*                                                                       00020400
+SHADOW   DSECT                     Record from SHADOW data set      @10 00020500
+USER     DS    CL8                 RAKF user                        @10 00020600
+SALT     DS    CL8                 SHA-256(salt) ||                 @10 00020700
+OUTPUT   DS    CL32                password)                        @10 00020800
+*                                                                       00020900
+R0       EQU   0                                                    @10 00021000
+R1       EQU   1                                                    @10 00021100
+R2       EQU   2                                                    @10 00021200
+R3       EQU   3                                                    @10 00021300
+R4       EQU   4                                                    @10 00021400
+R5       EQU   5                   # entries in PWUP table          @10 00021500
+R6       EQU   6                   Entry in PWUP table              @10 00021600
+R7       EQU   7                                                    @10 00021700
+R8       EQU   8                                                    @10 00021800
+R9       EQU   9                                                    @10 00021900
+R10      EQU   10                                                   @10 00022000
+R11      EQU   11                                                   @10 00022100
+R12      EQU   12                                                   @10 00022200
+R13      EQU   13                  Base register                    @10 00022300
+R14      EQU   14                                                   @10 00022400
+R15      EQU   15                                                   @10 00022500
+         END   RAKFPSAV            end of program                       00022600
