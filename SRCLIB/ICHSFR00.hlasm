@@ -1,7 +1,7 @@
 ICHSFR00 TITLE 'SAF ROUTER - ENTRY FOR ALL SECURITY CALLS'              00010000
 * CPARM='XREF(SHORT),RENT,OBJ,NODECK',LPARM='RENT,REUS,MAP'   ICHSFR00  00020000
 *      DD DSN=SYS1.MACLIB,DISP=SHR                                      00030000
-*      DD DSN=SYS1.MODGEN,DISP=SHR                                      00040000
+*      DD DSN=SYS1.AMODGEN,DISP=SHR                                     00040000
 *      DD DSN=SYS3.SAF.PARMLIB,DISP=SHR                                 00050000
          EJECT                                                          00060000
 ICHSFR00 CSECT                                                          00070000
@@ -19,6 +19,11 @@ ICHSFR00 CSECT                                                          00070000
 *                                  2 MARC COURT                      *  00190000
 *                                  EDISON, NEW JERSEY 08820          *  00200000
 *                                                                    *  00210000
+*                                                                    *  00210010
+*   !!!!! DO NOT RENUMBER !!!!! enter NUMBER OFF before editing      *  00210020
+*                               But better is letting SMP doing      *  00210030
+*                               the EDIT.                            *  00210040
+*                                                                    *  00210050
 **********************************************************************  00220000
 *                                                                   @02 00220302
 *    Change History                                                 @02 00220502
@@ -32,12 +37,12 @@ ICHSFR00 CSECT                                                          00070000
 *                       for replacement in the RAKF users table     @02 00224502
 *                       at next run of RAKFUSER                     @02 00224702
 *                                                                   @02 00226002
-*    2026/02/28 RRKF005 Two users, STC and PROD, were hard coded    @05 00228505
-*                       in to RAKF with a username and password     @05 00228505
-*                       added to the user table. These have since   @05 00228505
-*                       been updated so that they can't be used     @05 00228505
+*    2026/02/28 RRKF005 Two users, STC and PROD, were hard coded    @05 00227205
+*                       in to RAKF with a username and password     @05 00227505
+*                       added to the user table. These have since   @05 00227805
+*                       been updated so that they can't be used     @05 00228105
 *                       interactively, a new WTO has been added also@05 00228505
-********************************************************************@02 00226302
+********************************************************************@02 00229002
 *                                                                       00230000
          USING AUTHDS,R10                                               00240000
          USING ICHSFR00,R15                                             00250000
@@ -52,9 +57,9 @@ AROUNDZP LR    R12,R15                                                  00320000
          USING ACEE,ACEEREG        ADDRESS ACEE                         00340000
          USING PSA,0               ADDRESS PSA                          00350000
          LR    R12,R15             FIRST BASE                           00360000
-         LA    R11,2048(,R12)      SECOND BASE (COVERS 4096-8191)
-         LA    R11,2048(,R11)      R11 = ICHSFR00 + 4096
-         USING ICHSFR00+4096,R11
+         LA    R11,2048(,R12)      SECOND BASE (COVERS 4096-8191)       00360100
+         LA    R11,2048(,R11)      R11 = ICHSFR00 + 4096                00360200
+         USING ICHSFR00+4096,R11                                        00360300
          L     R9,24(R1)           ADDRESS EXIT WORK AREA               00370000
          USING WORKSAVE,R9         ... HELLO SAVE AREA                  00380000
          XC    WORKAREA(WORKAREL),WORKAREA CLEAR WORKAREA               00390000
@@ -368,41 +373,41 @@ RACIIDOK TM    3(R8),X'08'         PASSCHK=NO?                          03510000
          BO    RACIACEE            YES, GO MAKE ACEE                    03520000
          ICM   R3,B'1111',8(R8)    GO TO RACINIT PASSWORD               03530000
          BZ    RACIINPW            NO PASSWORD -> INVALID               03540000
-         MVC   WORKPASS,0(R3)      MOVE PASSWORD (LEN + UP TO 8 CHARS)
-*        hash SALT||candidate via RAKFPWH and compare to stored hash
-         GETMAIN RU,LV=HASHWKL     work area for hashing (key 0 here)
-         LR    R2,R1              R2 -> gotten area
-         USING HASHWKD,R2
-         ST    R13,HWR13          save caller save-area pointer
-         LA    R0,CBLKSALT        A(salt) - CBLK based on R4
-         ST    R0,HWPL+0
-         LA    R0,WORKPASS+1      A(candidate password chars)
-         ST    R0,HWPL+4
-         SR    R0,R0
-         IC    R0,WORKPASS        candidate password length
-         ST    R0,HWPWLEN
-         LA    R0,HWPWLEN
-         ST    R0,HWPL+8          A(pwlen)
-         LA    R0,HWOUT
-         ST    R0,HWPL+12         A(output hash)
-         LA    R0,HWWORK
-         ST    R0,HWPL+16         A(RAKFPWH work area)
-         LA    R1,HWPL            R1 -> parameter list
-         LA    R13,HWSAVE         save area for the call
-         L     R15,=V(RAKFPWH)
-         BALR  R14,R15            compute SHA-256(salt||password)
-         L     R13,HWR13          restore caller save-area pointer
-         CLC   CBLKHASH,HWOUT     stored hash vs computed hash
-         BNE   RACIPWNO           mismatch
-         LA    R3,1               match flag
-         B     RACIPWFR
-RACIPWNO LA    R3,0               mismatch flag
-RACIPWFR LR    R1,R2              area to free
-         DROP  R2
-         FREEMAIN RU,LV=HASHWKL,A=(R1)  release work area
-         LTR   R3,R3              matched?
-         BNZ   RACIPWOK           yes, password is correct
-         B     RACIINPW           no, invalid password
+         MVC   WORKPASS,0(R3)      MOVE PASSWORD (LEN + UP TO 8 CHARS)  03540005
+*        hash SALT||candidate via RAKFPWH and compare to stored hash    03540010
+         GETMAIN RU,LV=HASHWKL     work area for hashing (key 0 here)   03540015
+         LR    R2,R1              R2 -> gotten area                     03540020
+         USING HASHWKD,R2                                               03540025
+         ST    R13,HWR13          save caller save-area pointer         03540030
+         LA    R0,CBLKSALT        A(salt) - CBLK based on R4            03540035
+         ST    R0,HWPL+0                                                03540040
+         LA    R0,WORKPASS+1      A(candidate password chars)           03540045
+         ST    R0,HWPL+4                                                03540050
+         SR    R0,R0                                                    03540055
+         IC    R0,WORKPASS        candidate password length             03540060
+         ST    R0,HWPWLEN                                               03540065
+         LA    R0,HWPWLEN                                               03540070
+         ST    R0,HWPL+8          A(pwlen)                              03540075
+         LA    R0,HWOUT                                                 03540080
+         ST    R0,HWPL+12         A(output hash)                        03540085
+         LA    R0,HWWORK                                                03540090
+         ST    R0,HWPL+16         A(RAKFPWH work area)                  03540095
+         LA    R1,HWPL            R1 -> parameter list                  03540100
+         LA    R13,HWSAVE         save area for the call                03540105
+         L     R15,=V(RAKFPWH)                                          03540110
+         BALR  R14,R15            compute SHA-256(salt||password)       03540115
+         L     R13,HWR13          restore caller save-area pointer      03540120
+         CLC   CBLKHASH,HWOUT     stored hash vs computed hash          03540125
+         BNE   RACIPWNO           mismatch                              03540130
+         LA    R3,1               match flag                            03540135
+         B     RACIPWFR                                                 03540140
+RACIPWNO LA    R3,0               mismatch flag                         03540145
+RACIPWFR LR    R1,R2              area to free                          03540150
+         DROP  R2                                                       03540155
+         FREEMAIN RU,LV=HASHWKL,A=(R1)  release work area               03540160
+         LTR   R3,R3              matched?                              03540165
+         BNZ   RACIPWOK           yes, password is correct              03540170
+         B     RACIINPW           no, invalid password                  03540175
 RACIPWOK EQU   *                                                        03640000
 RACICHPW EQU   *                                                        03650000
 RACINCL2 EQU   *                                                        03660000
@@ -459,7 +464,7 @@ PWUPHXTB DC    C'0123456789ABCDEF' translate RAKFPWUP address to >  @02 03799402
 PWUPXTBA DC    A(PWUPHXTB-240)      > hex printable format          @02 03799502
 RACIRPWD MVC   CBLKPWDL(1),WORKPASS replace in core password            03800000
 RACICKPW CLC   CBLKPWDL(1),WORKPASS check password                      03810000
-*RACISTPW removed - no longer referenced
+*RACISTPW removed - no longer referenced                                03810100
 RACIERR1 MVC   WORKWTO+4(60),WTOMSG1 CJYUSERS INVALID                   03830000
          WTO   MF=(E,WORKWTO)      WRITE IT                             03840000
          MVC   WORKWTO+4(60),WTOMSG2 STC ACCESS                         03850000
@@ -823,7 +828,7 @@ ENTYJOBN MVC   WORKWTO+4+WTOMSGEJ(L'WTOMSGEJ),0(R3) MOVE JOBNAME        07390000
          CLC   =C'DATASET',WORKCLAS CLASS = DATASET                     07410000
          BE    ENTYWTO1            GO DO WTO                            07420000
          LA    R1,5                LEN = 6                              07430000
-         CLC   =C'VOL',WORKCLAS+4  CLASS DASDVOL OR TAPEVOL
+         CLC   =C'VOL',WORKCLAS+4  CLASS DASDVOL OR TAPEVOL             07440000
          BE    ENTYWTO1            DO WTO ...                           07450000
          LA    R1,38               FACILITY = 39                        07460000
          CLC   =C'FACILITY',WORKCLAS CLASS=FACILITY                     07470000
@@ -856,11 +861,13 @@ WTOPROD  MVC   WORKWTO(REALWTOL),REALWTO INIT WTO                       07599500
          MVC   WORKWTO+4(60),WTOMSG11 MOVE MESSAGE                      07599600
          ICM   R2,B'1111',PSAAOLD  GET ASCB                             07599700
          BZ    WTOPROD1            NO ASCB                              07599800
-         MVC   WORKWTO+4+WTMSG11J(8),ASCBJBNI-ASCB(R2) MOVE JOB NAME    07599900
+         ICM   R2,B'1111',ASCBJBNI-ASCB(R2)  Point to jobname           07599810
+         BZ    WTOPROD1            No Jobname                           07599820
+         MVC   WORKWTO+4+WTMSG11J(8),0(R2) Move Jobname                 07599900
 WTOPROD1 WTO   MF=(E,WORKWTO)      ISSUE MESSAGE                        07600000
          BR    R10                 RETURN                               07600100
 *                                                                       07600200
-         TITLE 'CONSTANTS AND SUCH'                                     07600000
+         TITLE 'CONSTANTS AND SUCH'                                     07600300
          LTORG                                                          07610000
 *                                                                       07620000
 STCUID   DC    AL4(0),X'03',CL8'STC',X'08',C'STCGROUP'                  07630000
@@ -898,7 +905,7 @@ WTOMSG11 DC    C'RAKF0011I JOB '                                        07899000
 WTMSG11J EQU   *-WTOMSG11,8                                             07900100
          DC    CL8' ',C' STARTED USING DEFAULT PROD ACCOUNT'            07900200
          DC    CL(60-(*-WTOMSG11))' '                                   07900300
-WTOMSGE  DC    C'XXXXXXXXX '                                            07900000
+WTOMSGE  DC    C'XXXXXXXXX '                                            07900500
 WTOMSGEU EQU   *-WTOMSGE,8                                              07910000
          DC    CL8' ',C','                                              07920000
 WTOMSGEJ EQU   *-WTOMSGE,8                                              07930000
@@ -946,16 +953,16 @@ WORKAUTH DS    X                   RACHECK/DEF/FRAC AUTHORITY REQ.      08350000
          DS    XL(150-(*-WORKAREA)) MAKE SURE                           08370000
 WORKAREL EQU   *-WORKAREA           S.B 150                             08380000
 *                                                                       08390000
-*        GETMAIN'd scratch for the RAKFPWH password-hash call
-HASHWKD  DSECT
-HWPL     DS    5F                  parmlist (salt,pw,pwlen,out,work)
-HWPWLEN  DS    F                   candidate password length
-HWR13    DS    F                   saved caller save-area pointer
-HWOUT    DS    CL32                computed SHA-256 hash
-HWSAVE   DS    18F                 save area for the RAKFPWH call
-HWWORK   DS    CL640               RAKFPWH work area (>= RPWWORKL)
-HASHWKL  EQU   *-HASHWKD           total length to GETMAIN
-*                                                                       08390000
+*        GETMAIN'd scratch for the RAKFPWH password-hash call           08390010
+HASHWKD  DSECT                                                          08390020
+HWPL     DS    5F                  parmlist (salt,pw,pwlen,out,work)    08390030
+HWPWLEN  DS    F                   candidate password length            08390040
+HWR13    DS    F                   saved caller save-area pointer       08390050
+HWOUT    DS    CL32                computed SHA-256 hash                08390060
+HWSAVE   DS    18F                 save area for the RAKFPWH call       08390070
+HWWORK   DS    CL640               RAKFPWH work area (>= RPWWORKL)      08390080
+HASHWKL  EQU   *-HASHWKD           total length to GETMAIN              08390090
+*                                                                       08390100
 AUTHDS   DSECT                     USED FOR RETURN FROM SUBS(R10)       08400000
 AUTHGOOD DS    F'0'                                                     08410000
 AUTHWARN DS    F'0'                                                     08420000
