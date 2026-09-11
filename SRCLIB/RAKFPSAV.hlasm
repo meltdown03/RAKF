@@ -1,4 +1,4 @@
-         TITLE 'Save Password Changes in RAKF SHADOW data set'     @10  00000100
+         TITLE 'Save Password Changes in RAKF SHADOW data set'      @10 00000100
 RAKFPSAV CSECT                                                          00000200
          PRINT NOGEN                                                    00000300
 *                                                                       00000400
