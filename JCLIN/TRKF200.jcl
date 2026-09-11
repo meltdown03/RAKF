@@ -26,6 +26,19 @@
 //*                                                                             
 //* JCLIN for RAKF 2.0 PTF RRKF002                                              
 //*                                                                             
+//* --- salted SHA-256 password hashing, called from ICHSFR00 -------           
+//ASMHASH  EXEC PGM=IFOX00,PARM=(NOOBJ,DECK)                                    
+//SYSLIB   DD  DISP=SHR,DSN=SYS1.MACLIB                                         
+//         DD  DISP=SHR,DSN=SYS1.AMODGEN                                        
+//         DD  DISP=SHR,DSN=RAKF.MACLIB                                         
+//SYSIN    DD  DISP=SHR,DSN=RAKF.SRCLIB(RAKFHASH)                               
+//SYSPUNCH DD  DISP=(OLD,PASS),DSN=&&OBJ(RAKFHASH)                              
+//ASMPWH   EXEC PGM=IFOX00,PARM=(NOOBJ,DECK)                                    
+//SYSLIB   DD  DISP=SHR,DSN=SYS1.MACLIB                                         
+//         DD  DISP=SHR,DSN=SYS1.AMODGEN                                        
+//         DD  DISP=SHR,DSN=RAKF.MACLIB                                         
+//SYSIN    DD  DISP=SHR,DSN=RAKF.SRCLIB(RAKFPWH)                                
+//SYSPUNCH DD  DISP=(OLD,PASS),DSN=&&OBJ(RAKFPWH)                               
 //ASMUSER  EXEC PGM=IFOX00,PARM=(NOOBJ,DECK)                                    
 //SYSLIB   DD  DISP=SHR,DSN=SYS1.MACLIB                                         
 //         DD  DISP=SHR,DSN=SYS1.AMODGEN                                        
@@ -44,6 +57,8 @@
 //SYSLIN   DD  *                                                                
  INCLUDE SYSPUNCH(RAKFUSER)                                                     
  INCLUDE SYSPUNCH(RAKFPSAV)                                                     
+ INCLUDE SYSPUNCH(RAKFPWH)
+ INCLUDE SYSPUNCH(RAKFHASH)
  ENTRY   CJYRUIDS                                                               
  NAME    RAKFUSER(R)                                                            
 /*                                                                              
@@ -84,19 +99,6 @@
 //         DD  DISP=SHR,DSN=RAKF.MACLIB                                         
 //SYSIN    DD  DISP=SHR,DSN=RAKF.SRCLIB(ICHSFR00)                               
 //SYSPUNCH DD  DISP=(OLD,PASS),DSN=&&OBJ(ICHSFR00)                              
-//* --- salted SHA-256 password hashing, called from ICHSFR00 -------           
-//ASMHASH  EXEC PGM=IFOX00,PARM=(NOOBJ,DECK)                                    
-//SYSLIB   DD  DISP=SHR,DSN=SYS1.MACLIB                                         
-//         DD  DISP=SHR,DSN=SYS1.AMODGEN                                        
-//         DD  DISP=SHR,DSN=RAKF.MACLIB                                         
-//SYSIN    DD  DISP=SHR,DSN=RAKF.SRCLIB(RAKFHASH)                               
-//SYSPUNCH DD  DISP=(OLD,PASS),DSN=&&OBJ(RAKFHASH)                              
-//ASMPWH   EXEC PGM=IFOX00,PARM=(NOOBJ,DECK)                                    
-//SYSLIB   DD  DISP=SHR,DSN=SYS1.MACLIB                                         
-//         DD  DISP=SHR,DSN=SYS1.AMODGEN                                        
-//         DD  DISP=SHR,DSN=RAKF.MACLIB                                         
-//SYSIN    DD  DISP=SHR,DSN=RAKF.SRCLIB(RAKFPWH)                                
-//SYSPUNCH DD  DISP=(OLD,PASS),DSN=&&OBJ(RAKFPWH)                               
 //ICHSFR00 EXEC  PGM=IEWL,PARM='MAP,LIST,NCAL,LET,RENT,REFR,REUS,AC=1'          
 //SYSLMOD  DD  DISP=SHR,DSN=SYS1.LPALIB                                         
 //SYSPUNCH DD  DISP=(OLD,PASS),DSN=&&OBJ                                        
