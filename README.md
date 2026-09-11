@@ -369,7 +369,7 @@ takes effect, either from the console with `S RAKFUSER` (and `S RAKFPROF` for
 profile changes) or by running the `RAKFUSER`/`RAKFPROF` utilities in batch.
 Until the reload, the new or changed credential exists only on disk.
 
-> ⚠️ Commands like ADDDSD, PERMIT and RDEFINE are not yet implemented
+> ⚠️ Commands like ADDSD, PERMIT and RDEFINE are not yet implemented
 > The PROFILES definitions should be edited.
 
 ### PROFILES table
