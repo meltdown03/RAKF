@@ -1,4 +1,4 @@
-         TITLE 'Save Password Changes in RAKF SHADOW data set'          00000100
+         TITLE 'Save Password Changes in RAKF SHADOW data set'     @10  00000100
 RAKFPSAV CSECT                                                          00000200
          PRINT NOGEN                                                    00000300
 *                                                                       00000400
@@ -12,7 +12,7 @@ RAKFPSAV CSECT                                                          00000200
 *                                                                    *  00001200
 * FUNCTION: - read the password change queue created by RAKFPWUP     *  00001300
 *             into memory                                            *  00001400
-*           - loop through the RAKF SHADOW table and check each line *  00001500
+*           - loop through the RAKF SHADOW table and check each line@10 00001500
 *             for a password change queue entry. If an entry exists  *  00001600
 *             update encrypt the password with a salt + encrypted    *  00001700
 *             32 byte field.                                         *  00001800
@@ -31,7 +31,7 @@ RAKFPSAV CSECT                                                          00000200
 *                 the new password, each padded to the right with    *  00003100
 *                 blanks to 8 characters.                            *  00003200
 *                                                                    *  00003300
-*    2026/09/07 RRKF011 Update the passwords from PWUP to the       @10 00003400
+*    2026/09/07 @10     Update the passwords from PWUP to the       @10 00003400
 *                       shadow data set. Formerly the updated       @10 00003500
 *                       passwords were saved in the USERS           @10 00003600
 *                       table, but since the passwords are          @10 00003700
@@ -168,7 +168,7 @@ RETURN   L     R13,SAVEAREA+4      get caller's savearea                00016300
 CHGBSIZE DS    F                   size of changes queue buffer         00016800
 ACHGBUF  DS    F                   address of changes queue buffer      00016900
 NCHANGES DS    F                   number of changes in queue           00017000
-WORKPASS DS    CL9                 Proposed length + password           00017100
+WORKPASS DS    CL9                 Proposed length + password       @10 00017100
 CHGRECL  DC    A(CHGLRECL)         record length of changes queue       00017200
 *                                                                       00017300
 HASHWKD  DS    0CL772              Area for RAKFPWH                 @10 00017400
