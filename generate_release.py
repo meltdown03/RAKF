@@ -988,7 +988,6 @@ install.extend([
     # Without it the OPEN fails with 'IEC130I RAKFSHAD DD STATEMENT MISSING',
     # no hashes load, and -- since build_credentials() blanks the USERS
     # password column -- every credential on the system becomes unverifiable.
-    'USERMODS/ZPY0001.jcl',
     'TOOLS/RAKFCUST.jcl',
     'AUX/VTOC/vtoc.jcl',
     'AUX/CDSCB.jcl',
