@@ -933,8 +933,8 @@ for jcl in install:
         # entirely. (They were originally trailing jobs, which also raced
         # RACIND -- separate jobs on separate initiators, same root cause.)
         emit_shadow_load(shadow_bytes)
-#       if not args.no_tools:
-#          emit_tools()
+        # if not args.no_tools:
+        # emit_tools()
         emit_help()
     elif 'VTOCSRAC' in jcl:
         emit_vtocsrac(path, guard_apply=args.upgrade)
