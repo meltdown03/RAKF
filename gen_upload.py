@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-gen_upload.py  -  Generate a JCL job to upload and assemble RAKF source files
+gen_upload.py  -  Generate a JCL job to upload RAKF source files
                   on an MVS 3.8j mainframe.
 
 Usage:
     python3 gen_upload.py [options] > upload.jcl
     python3 gen_upload.py --only ICHSFR00 > upload.jcl
+    python3 gen_upload.py --assemble > upload.jcl
     python3 gen_upload.py --changes > upload.jcl
     python3 gen_upload.py --submit            # send directly to card reader
 
@@ -16,18 +17,21 @@ Upload behaviour:
   Full reload (no --only):
     IDCAMS deletes every target PDS, IEFBR14 re-allocates them, PDSLOAD loads all.
   Partial reload (--only MEMBER):
-    MACLIB is still fully deleted/reallocated/reloaded (assembly needs current macros).
     The library containing MEMBER is loaded with PDSLOAD DISP=SHR (member replace).
+    If --assemble is also given, MACLIB is fully deleted/reallocated/reloaded
+    (assembly needs current macros).
     NOTE: target PDSes must already exist. Run without --only for initial setup.
 
 Assembly behaviour:
-  Default (no --changes, no --only):
-    Assemble and link every module defined in MODULES.
+  Default: upload and PDSLOAD only; do not assemble or link.
+  --assemble:
+    Assemble and link every module defined in MODULES (or the --only subset).
   --changes:
-    Only assemble modules whose source files have uncommitted git changes.
-  --only MEMBER:
+    Implies --assemble. Only assemble modules whose source files have
+    uncommitted git changes.
+  --assemble --only MEMBER:
     Only assemble modules that include MEMBER in their source list.
-  --changes + --only:
+  --changes --only MEMBER:
     Intersection of the above two.
 
 SPF statistics are derived from filesystem timestamps:
@@ -68,7 +72,7 @@ CARD_PORT        = 3505
 # Subdirectories to skip during auto-discovery (not PDS-style libraries)
 SKIP_DIRS = frozenset({"TEMPLATES", "AUX", "JCLIN", "USERMODS", "TOOLS"})
 
-# Libraries always fully reloaded (delete+alloc+load) even with --only,
+# Libraries fully reloaded (delete+alloc+load) with --only when assembling,
 # because they contain macros required by the assembler.
 ALWAYS_FULL_UPLOAD = frozenset({"MACLIB"})
 
@@ -95,12 +99,22 @@ MODULES = [
     Module("RAKFUSER", ["RAKFUSER", "RAKFPSAV"],           ["ASMUSER", "ASMPSAV"],  "CJYRUIDS", "SYS1.LINKLIB", "MAP,LIST,LET,NCAL,AC=1"),
     Module("RAKFPROF", ["RAKFPROF"],                       ["ASMPROF"],             "CJYRPROF", "SYS1.LINKLIB", "MAP,LIST,LET,NCAL,AC=1"),
     Module("RAKFPWUP", ["RAKFPWUP"],                       ["ASMPWUP"],             "RAKFPWUP", "SYS1.LINKLIB", "MAP,LIST,LET,NCAL,AC=1"),
-    Module("ICHSFR00", ["ICHSFR00"],                       ["ASMSFR"],              "ICHSFR00", "SYS1.LPALIB",  "MAP,LIST,NCAL,LET,RENT,REFR,REUS,AC=1"),
+    Module(
+    "ICHSFR00",
+    ["ICHSFR00", "RAKFHASH", "RAKFPWH"],
+    ["ASMSFR", "ASMHASH", "ASMPWH"],
+    "ICHSFR00",
+    "SYS1.LPALIB",
+    "MAP,LIST,NCAL,RENT,REFR,REUS,AC=1",
+    ),
     Module("ICHRIN00", ["ICHRIN00", "IGC00130", "IGC0013A", "IGC0013C"],
                        ["ASMRIN",  "ASM130",   "ASM13A",   "ASM13C"],
                        "ICHRIN00", "SYS1.LPALIB",  "MAP,LIST,NCAL,LET,RENT,REFR,REUS,AC=1",
                        aliases=["IGC0013{", "IGC0013A", "IGC0013B", "IGC0013C"]),
     Module("RACIND",   ["RACIND"],                         ["ASMIND"],              "RACIND",   "SYS1.LINKLIB", "MAP,LIST,LET,NCAL,AC=1"),
+    Module("ADDUSER",  ["ADDUSER", "RAKFPWH", "RAKFHASH"], ["ASMADD", "ASMPWHA", "ASMHASHA"], "ADDUSER", "SYS2.CMDLIB", "MAP,LIST,LET,NCAL,AC=1"),
+    Module("ALTUSER",  ["ALTUSER", "RAKFPWH", "RAKFHASH"], ["ASMALT", "ASMPWHB", "ASMHASHB"], "ALTUSER", "SYS2.CMDLIB", "MAP,LIST,LET,NCAL,AC=1"),
+    Module("DELUSER",  ["DELUSER"],                        ["ASMDEL"],              "DELUSER",  "SYS2.CMDLIB",  "MAP,LIST,LET,NCAL,AC=1"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -398,6 +412,7 @@ def build_steps(modules: list, hlq: str) -> list:
     all_steps: list[list] = []
     obj_syspunch_indices: list[tuple[int, int]] = []  # (step_idx, line_idx)
     obj_created = False
+    assembled_sources = set()
 
     for mod in modules:
         out += [
@@ -408,14 +423,19 @@ def build_steps(modules: list, hlq: str) -> list:
 
         # --- Assembly step(s) ---
         for src, step_name in zip(mod.sources, mod.asm_steps):
+            if src in assembled_sources:
+                continue
+
             if obj_created:
                 obj_disp = f"DISP=(OLD,PASS),DSN=&&OBJ({src}),UNIT=SYSALLDA"
             else:
                 obj_disp = f"DSN=&&OBJ({src}),DISP=(MOD,PASS),\n//             SPACE=(800,(2000,1000,10)),UNIT=SYSDA"
                 obj_created = True
 
+            # COND=(4,GT): IFOX00 CC=4 is warnings; (0,NE) skipped every
+            # later ASM/link after the first warning (JCLIN has no COND).
             step = [
-                f"//{step_name:<8} EXEC PGM=IFOX00,PARM=(NOOBJ,DECK),COND=(0,NE)",
+                f"//{step_name:<8} EXEC PGM=IFOX00,PARM=(NOOBJ,DECK),COND=(4,LT)",
                 f"//SYSLIB   DD  DISP=SHR,DSN=SYS1.MACLIB",
                 f"//         DD  DISP=SHR,DSN=SYS1.AMODGEN",
                 f"//         DD  DISP=SHR,DSN={hlq}.MACLIB",
@@ -426,15 +446,15 @@ def build_steps(modules: list, hlq: str) -> list:
                 f"//SYSPUNCH DD  {obj_disp}",
                 f"//SYSPRINT DD  SYSOUT=*",
             ]
-            syspunch_idx = 5   # index of the SYSPUNCH line within `step`
+            syspunch_idx = 8   # SYSPUNCH line within `step`
             obj_syspunch_indices.append((len(all_steps), syspunch_idx))
             all_steps.append(step)
+            assembled_sources.add(src)
 
         # --- Link step ---
         link_step = [
-            f"//{mod.name:<8} EXEC PGM=IEWL,",
-            f"//  PARM='{mod.link_parm}',",
-            f"//  COND=(0,NE)",
+            f"//{mod.name:<8} EXEC PGM=IEWL,COND=(4,LT),",
+            f"//  PARM='{mod.link_parm}'",
             f"//SYSPRINT DD  SYSOUT=*",
             f"//SYSLMOD  DD  DISP=SHR,DSN={mod.target}",
             f"//SYSPUNCH DD  DISP=(OLD,PASS),DSN=&&OBJ",
@@ -475,6 +495,7 @@ def build_steps(modules: list, hlq: str) -> list:
 def build_load_plan(
     all_libs: list,
     member_filter: str | None,
+    assemble: bool = False,
 ) -> list:
     """
     Return (local_dir, dsn, files, is_full_reload) tuples.
@@ -498,7 +519,7 @@ def build_load_plan(
         if member_filter is None:
             plan.append((local_dir, dsn, all_files, True))
 
-        elif local_dir.upper() in ALWAYS_FULL_UPLOAD:
+        elif assemble and local_dir.upper() in ALWAYS_FULL_UPLOAD:
             plan.append((local_dir, dsn, all_files, True))
 
         else:
@@ -528,16 +549,17 @@ def generate(
     password: str,
     hlq: str = DEFAULT_HLQ,
     changes_only: bool = False,
+    assemble: bool = False,
 ) -> str:
     # Discover library directories
     all_libs = discover_libraries(hlq)
 
-    # Apply --libs filter; with --only, always keep ALWAYS_FULL_UPLOAD
+    # Apply --libs filter; with --only --assemble, also keep ALWAYS_FULL_UPLOAD
     if libs_filter:
         libs_upper = {l.upper() for l in libs_filter}
         kept = [(d, dsn) for d, dsn in all_libs if d.upper() in libs_upper]
 
-        if member_filter:
+        if assemble and member_filter:
             kept_upper = {d.upper() for d, _ in kept}
             for d, dsn in all_libs:
                 if d.upper() in ALWAYS_FULL_UPLOAD and d.upper() not in kept_upper:
@@ -549,7 +571,7 @@ def generate(
         print("ERROR: no libraries found to process", file=sys.stderr)
         sys.exit(1)
 
-    plan = build_load_plan(all_libs, member_filter)
+    plan = build_load_plan(all_libs, member_filter, assemble)
     if not plan:
         print("ERROR: nothing to upload", file=sys.stderr)
         sys.exit(1)
@@ -569,8 +591,9 @@ def generate(
     for i, (_, dsn, files, _) in enumerate(plan, 1):
         lines.extend(pdsload_step(f"LOAD{i:04d}", dsn, files, userid))
 
-    modules = select_modules(changes_only, member_filter)
-    lines.extend(build_steps(modules, hlq))
+    if assemble:
+        modules = select_modules(changes_only, member_filter)
+        lines.extend(build_steps(modules, hlq))
 
     return "\n".join(lines) + "\n"
 
@@ -602,13 +625,21 @@ def main() -> None:
     parser.add_argument(
         "--only", metavar="MEMBER", type=str.upper,
         help=(
-            "Upload only this member (MACLIB always fully reloaded). "
-            "Assembly is restricted to modules that include this member."
+            "Upload only this member (PDSLOAD DISP=SHR replace). "
+            "With --assemble, MACLIB is fully reloaded and assembly is "
+            "restricted to modules that include this member."
         ),
     )
     parser.add_argument(
+        "--assemble", action="store_true",
+        help="Also assemble and link modules after the PDSLOAD steps.",
+    )
+    parser.add_argument(
         "--changes", action="store_true",
-        help="Only assemble modules whose source files have uncommitted git changes.",
+        help=(
+            "Implies --assemble. Only assemble modules whose source files "
+            "have uncommitted git changes."
+        ),
     )
     parser.add_argument(
         "--libs", metavar="LIB", nargs="+",
@@ -649,6 +680,7 @@ def main() -> None:
     args = parser.parse_args()
 
     jobname = args.jobname[:8].upper()
+    assemble = args.assemble or args.changes
     jcl = generate(
         jobname,
         args.libs or [],
@@ -657,6 +689,7 @@ def main() -> None:
         args.password,
         args.hlq,
         args.changes,
+        assemble,
     )
 
     if args.submit:

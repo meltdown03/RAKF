@@ -1,11 +1,11 @@
-//VSAMLRAC JOB (RACIND),
+//VSAMSRAC JOB (RACIND),
 //             'SET RACF INDICATOR',
 //             CLASS=A,REGION=4M,
-//             MSGCLASS=A,
+//             MSGCLASS=A,USER=IBMUSER,PASSWORD=SYS1,
 //             MSGLEVEL=(1,1)
 //********************************************************************
 //*
-//* NAME: VSAMLRAC
+//* NAME: VSAMSRAC
 //*
 //* DESC: LIST RACF INDICATOR STATUS OF ALL VSAM OBJECTS
 //*
@@ -40,7 +40,7 @@ J = 2
 DO I = 1 TO INDATA.0
     PARSE VAR INDATA.I . . CAT .
     IF INDEX(INDATA.I,'0USERCATALOG') > 0 THEN DO
-        OUTDD.J = " LISTCAT ALL CAT("||CAT||")"
+        OUTDD.J = " LISTCAT ALL CAT("CAT")"
         J = J + 1
     END
 END
@@ -87,7 +87,7 @@ DO I=1 TO INDATA.0
         IF CAT = CATALOG THEN ITERATE
         SAY "CATALOG   " CAT
         CATALOG = CAT
-        ENTRIES.E = "CATALOG   "||CAT
+        ENTRIES.E = "CATALOG   "CAT
         E = E + 1
     END
     IF INDEX(INDATA.I, 'CLUSTER ') > 0 THEN DO
@@ -107,11 +107,11 @@ DO I=1 TO INDATA.0
     END
     IF INDEX(INDATA.I, 'RACF') > 0 THEN DO
         IF INDEX(INDATA.I, 'NO') > 0 THEN DO
-            IF ENTRY \= BAD_DATA & ENTRY \= BAD_INDEX THEN DO
+            IF ENTRY <> BAD_DATA & ENTRY <> BAD_INDEX THEN DO
                 IF RACF = 'ON' THEN R = "RACON     "
                 ELSE R = "RACOFF    "
                 SAY R ENTRY
-                ENTRIES.E = R||ENTRY
+                ENTRIES.E = R''ENTRY
                 E = E + 1
             END
         END

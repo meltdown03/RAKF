@@ -41,7 +41,7 @@ J = 2
 DO I = 1 TO INDATA.0
     PARSE VAR INDATA.I . . CAT .
     IF INDEX(INDATA.I,'0USERCATALOG') > 0 THEN DO
-        OUTDD.J = " LISTCAT ALL CAT("||CAT||")"
+        OUTDD.J = " LISTCAT ALL CAT("CAT")"
         J = J + 1
     END
 END
