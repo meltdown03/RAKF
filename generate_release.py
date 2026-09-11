@@ -26,8 +26,6 @@ arg_parser.add_argument('-x', '--xmit', default=None,
                         help="TSO XMIT of the admin tools (default: newest APPLICATIONS/dist/*.xmit)")
 arg_parser.add_argument('-o', '--output', default=None,
                         help="Output file (binary EBCDIC card images). Default: stdout.")
-arg_parser.add_argument('--cmdlib', default="SYS2.CMDLIB",
-                        help="Target load library for ADDUSER/ALTUSER")
 arg_parser.add_argument('--helplib', default="SYS2.HELP",
                         help="Target help library for the ADDUSER/ALTUSER HELP members")
 arg_parser.add_argument('--volume', default="PUB000",
@@ -748,77 +746,6 @@ def pick_dlm(xmit_bytes):
 
 # Also a continuation of RAKFINST, for the same reason as SHADOW_LOAD above:
 # separate jobs run on separate initiators and race the install they depend on.
-TOOLS_HEADER = """//*******************************************************************
-//* Install the cc370-built RAKF admin tools (ADDUSER, ALTUSER).
-//* They are C load modules (cannot be assembled on MVS), shipped as
-//* an inline TSO XMIT read by the EBCDIC card reader, then installed
-//* with RECEIVE + IEBCOPY into {cmdlib}.
-//*******************************************************************
-//DELOLD  EXEC PGM=IDCAMS
-//SYSPRINT DD SYSOUT=*
-//SYSIN    DD *
-  DELETE RAKF.TOOLS.XMIT    SCRATCH PURGE
-  DELETE RAKF.TOOLS.LINKLIB SCRATCH PURGE
-  SET MAXCC=0
-//* --- stage the inline XMIT binary into an FB80 dataset -----------
-//STAGE   EXEC PGM=IEBGENER
-//SYSPRINT DD SYSOUT=*
-//SYSIN    DD DUMMY
-//SYSUT2   DD DSN=RAKF.TOOLS.XMIT,DISP=(,CATLG,DELETE),
-//            UNIT=SYSDA,VOL=SER={vol},SPACE=(TRK,(200,50)),
-//            DCB=(RECFM=FB,LRECL=80,BLKSIZE=3120)
-//SYSUT1   DD DATA,DLM='{dlm}'"""
-
-# The XMIT has to be unpacked into a load library before IEBCOPY can put the
-# members into the command library. There are two ways to do that and which one
-# works depends on when in a system's life RAKF is being installed:
-#
-#   TSO RECEIVE  the normal path on a finished system, but RECEIVE/TRANSMIT is
-#                NOT part of base MVS 3.8J -- on MVS/CE it arrives with NJE38,
-#                which needs MVP, which needs RAKF. Installing RAKF during a
-#                sysgen therefore hits 'IKJ56500I COMMAND RECEIVE NOT FOUND'.
-#
-#   RECV370      a standalone unXMIT program in SYSC.LINKLIB, present from the
-#                base sysgen onward (sysgen's own BREXX step uses it), so it
-#                works before TSO RECEIVE exists. Selected with --recv370.
-#
-# RECEIVE self-allocates its output; RECV370 does not, so the RECV370 form has
-# to allocate RAKF.TOOLS.LINKLIB itself. It is modelled on the command library
-# with DCB={cmdlib} so the IEBCOPY that follows is a same-DCB copy.
-TOOLS_RECV_TSO = """//* --- RECEIVE the XMIT into a transient load library -------------
-//RECV    EXEC PGM=IKJEFT01,DYNAMNBR=50
-//SYSTSPRT DD SYSOUT=*
-//SYSTSIN  DD *
-  RECEIVE INDSN('RAKF.TOOLS.XMIT') DATASET('RAKF.TOOLS.LINKLIB')"""
-
-TOOLS_RECV_370 = """//* --- unXMIT into a transient load library with RECV370 ----------
-//RECV    EXEC PGM=RECV370,REGION=4096K
-//STEPLIB  DD DISP=SHR,DSN=SYSC.LINKLIB
-//RECVLOG  DD SYSOUT=*
-//XMITIN   DD DSN=RAKF.TOOLS.XMIT,DISP=SHR
-//SYSPRINT DD SYSOUT=*
-//SYSUT1   DD DSN=&&RECVWRK,UNIT=SYSDA,VOL=SER={vol},
-//            SPACE=(CYL,(10,10)),DISP=(NEW,DELETE,DELETE)
-//SYSUT2   DD DSN=RAKF.TOOLS.LINKLIB,DISP=(,CATLG,DELETE),
-//            UNIT=SYSDA,VOL=SER={vol},SPACE=(CYL,(5,5,20),RLSE),
-//            DCB={cmdlib}
-//SYSIN    DD DUMMY"""
-
-TOOLS_INSTALL = """//* --- copy the tool members into the command library ------------
-//INSTALL EXEC PGM=IEBCOPY
-//SYSPRINT DD SYSOUT=*
-//IN       DD DSN=RAKF.TOOLS.LINKLIB,DISP=SHR
-//OUT      DD DSN={cmdlib},DISP=SHR
-//SYSIN    DD *
-  COPY OUTDD=OUT,INDD=((IN,R))
-//* --- clean up the staging datasets -----------------------------
-//CLEANUP EXEC PGM=IDCAMS
-//SYSPRINT DD SYSOUT=*
-//SYSIN    DD *
-  DELETE RAKF.TOOLS.XMIT    SCRATCH PURGE
-  DELETE RAKF.TOOLS.LINKLIB SCRATCH PURGE
-  SET MAXCC=0"""
-
 
 HELP_HEADER = """//* --- TSO HELP members for the admin commands -------------------
 //HELPLOAD EXEC PGM=PDSLOAD
