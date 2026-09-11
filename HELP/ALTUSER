@@ -83,7 +83,7 @@
   If not, the command ends with a suitable message.                             
   Use ADDUSER to create a user with the groups you need.                        
   An alias of DFLTGRP is DGRP.                                                  
-))OPERATIONS - Turns the OPERATIONS attribuat on (Y) for every line of          
+))OPERATIONS - Turns the OPERATIONS attribute on (Y) for every line of          
   the user.  Optional.                                                          
 ))NOOPERATIONS - Turns the OPERATIONS attribute off (N) for every line          
   of the user.  Optional.                                                       
