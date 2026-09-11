@@ -786,29 +786,6 @@ def emit_help():
     emit("/*")
 
 
-def emit_tools():
-    xmit_path = find_xmit()
-    if not xmit_path or not os.path.isfile(xmit_path):
-        sys.exit("generate_release.py: admin-tool XMIT not found. Build it first:\n"
-                 "    cd APPLICATIONS && PATH=~/.local/bin:$PATH make package\n"
-                 "or pass --xmit <path>.")
-    with open(xmit_path, 'rb') as f:
-        xmit = f.read()
-    if len(xmit) % 80 != 0:
-        sys.exit("generate_release.py: XMIT is not FB80 (len {} not a multiple of 80).".format(len(xmit)))
-    dlm = pick_dlm(xmit)
-    sys.stderr.write("[gen] embedding {} ({} bytes, DLM={})\n".format(xmit_path, len(xmit), dlm))
-    (emit_guarded_text if args.upgrade else emit_text)(
-        TOOLS_HEADER.format(cmdlib=args.cmdlib, vol=args.volume, dlm=dlm))
-    OUT.extend(xmit)          # raw binary, already 80-byte card images
-    emit(dlm)                 # delimiter card closes the DD DATA
-    recv = TOOLS_RECV_370 if args.recv370 else TOOLS_RECV_TSO
-    sys.stderr.write("[gen] unXMIT step: {}\n".format("RECV370" if args.recv370 else "TSO RECEIVE"))
-    (emit_guarded_text if args.upgrade else emit_text)(
-        recv.format(cmdlib=args.cmdlib, vol=args.volume))
-    (emit_guarded_text if args.upgrade else emit_text)(
-        TOOLS_INSTALL.format(cmdlib=args.cmdlib))
-
 
 # ------------------------------------------------------------------ #
 #  Standalone shadow-file recovery mode.                              #
