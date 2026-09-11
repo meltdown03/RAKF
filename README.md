@@ -369,10 +369,8 @@ takes effect, either from the console with `S RAKFUSER` (and `S RAKFPROF` for
 profile changes) or by running the `RAKFUSER`/`RAKFPROF` utilities in batch.
 Until the reload, the new or changed credential exists only on disk.
 
-> :warning: **Deleting a user** (`DELUSER`) and connecting/removing groups
-> (`CONNECT`/`REMOVE`) are not yet implemented. For now, remove a user by
-> deleting their line(s) from the `USERS` member and their record from
-> `SYS1.SECURE.SHADOW`, then reload with `S RAKFUSER`.
+> :warning Commands like ADDDSD, PERMIT and RDEFINE are not yet implemented
+> The PROFILES definitions should be edited.
 
 ### PROFILES table
 
