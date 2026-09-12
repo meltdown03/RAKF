@@ -115,8 +115,8 @@ python script. The most common arguments are:
   (its plaintext passwords are hashed into the shadow file at generation time —
   see *Password Hashing and the Shadow File*)
 - `--profiles` use a custom profiles file instead of the default `profiles.txt`
-- `--xmit` path to an externally supplied admin-tool XMIT
-- `--cmdlib` load library for the tools (default `SYS2.CMDLIB`)
+- `--xmit` path to an externally supplied command-library XMIT
+- `--cmdlib` load library for external XMIT members (default `SYS2.CMDLIB`)
 - `--no-tools` force a core-only install stream without an external XMIT
 
 The RAKF core, including the HLASM `ADDUSER`, `ALTUSER`, and `DELUSER` command
@@ -127,7 +127,7 @@ Generate the install file:
 python3 generate_release.py -u users.txt -p profiles.txt -o install_rakf.jcl
 ```
 
-To embed an externally built FB80 admin-tool XMIT, pass its path explicitly:
+To embed an externally built FB80 command-library XMIT, pass its path explicitly:
 
 ```
 python3 generate_release.py -u users.txt -p profiles.txt \
@@ -936,7 +936,7 @@ changed.
   `generate_release.py` blanks the password column and emits the shadow
   records into the install stream, so no clear-text password reaches the
   system and there is no chicken-and-egg with the tools above.
-- `--recv370` unpacks the admin tools with `RECV370` instead of TSO RECEIVE,
+- `--recv370` unpacks an external XMIT with `RECV370` instead of TSO RECEIVE,
   for installing RAKF during a sysgen before the TSO XMIT facility exists.
 
 ## Appendix A - Generating your own release
@@ -1209,4 +1209,3 @@ RACON     TSTCAT.CLUSTER.DATA
 /*
 //
 ```
-

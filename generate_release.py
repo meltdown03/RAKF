@@ -3,7 +3,7 @@
 # Generate the RAKF install job stream.
 #
 # The RAKF core (HLASM modules, procs, macros) ships as SMP source that MVS
-# assembles/link-edits on-target. An optional externally supplied admin-tool
+# assembles/link-edits on-target. An optional externally supplied command-library
 # XMIT can be embedded after a `DD DATA,DLM=` card and installed on-target
 # with RECEIVE + IEBCOPY.
 #
@@ -20,11 +20,11 @@ arg_parser = argparse.ArgumentParser()
 arg_parser.add_argument('-u', '--users', help="Custom users file", default=False)
 arg_parser.add_argument('-p', '--profiles', help="Custom profiles file", default=False)
 arg_parser.add_argument('-x', '--xmit', default=None,
-                        help="TSO XMIT of the admin tools")
+                        help="External command-library TSO XMIT")
 arg_parser.add_argument('-o', '--output', default=None,
                         help="Output file (binary EBCDIC card images). Default: stdout.")
 arg_parser.add_argument('--cmdlib', default="SYS2.CMDLIB",
-                        help="Target library for the ADDUSER/ALTUSER programs")
+                        help="Target library for external XMIT members")
 arg_parser.add_argument('--helplib', default="SYS2.HELP",
                         help="Target help library for the ADDUSER/ALTUSER HELP members")
 arg_parser.add_argument('--volume', default="PUB000",
@@ -32,9 +32,9 @@ arg_parser.add_argument('--volume', default="PUB000",
 arg_parser.add_argument('--codepage', default="cp037",
                         help="EBCDIC codepage for card images (cp037 or cp1047)")
 arg_parser.add_argument('--no-tools', action="store_true",
-                        help="Emit the RAKF core only, without the admin tools")
+                        help="Do not embed an external XMIT")
 arg_parser.add_argument('--recv370', action="store_true",
-                        help="Unpack the admin-tool XMIT with RECV370 (SYSC.LINKLIB) "
+                        help="Unpack the external XMIT with RECV370 (SYSC.LINKLIB) "
                              "instead of TSO RECEIVE. Needed when RAKF is installed "
                              "during a sysgen, before the TSO XMIT facility exists.")
 arg_parser.add_argument('--shadow-recovery', action='store_true',
@@ -720,7 +720,7 @@ def emit_rakfcust(filename, inserts):
 
 
 # ------------------------------------------------------------------ #
-#  Inline the admin-tool XMIT (raw binary) into the stream.          #
+#  Inline an external command-library XMIT (raw binary) into stream. #
 # ------------------------------------------------------------------ #
 def find_xmit():
     return args.xmit
@@ -739,7 +739,7 @@ def pick_dlm(xmit_bytes):
 # Also a continuation of RAKFINST, for the same reason as SHADOW_LOAD above:
 # separate jobs run on separate initiators and race the install they depend on.
 TOOLS_HEADER = """//*******************************************************************
-//* Install externally supplied RAKF admin tools (ADDUSER, ALTUSER).
+//* Install an externally supplied RAKF command-library XMIT.
 //* The inline TSO XMIT is staged from the EBCDIC card reader, then
 //* installed with RECEIVE + IEBCOPY into {cmdlib}.
 //*******************************************************************
@@ -833,7 +833,7 @@ def emit_tools():
     """Embed an explicitly supplied FB80 XMIT and install its members."""
     xmit_path = find_xmit()
     if not xmit_path or not os.path.isfile(xmit_path):
-        sys.exit("generate_release.py: admin-tool XMIT not found: {}"
+        sys.exit("generate_release.py: external XMIT not found: {}"
                  .format(xmit_path))
     with open(xmit_path, 'rb') as f:
         xmit = f.read()
