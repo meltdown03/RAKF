@@ -9,13 +9,13 @@ User's Guide
 > **Important**
 > New for version 2.0.0 users are hashed and stores in a shadow file.
 > as a result adding new users requires using the TSO command ADDUSER
-> and changing requires ALTUSER. Read the HELP/ files for more defails
+> and changing requires ALTUSER. Read the HELP/ files for more details
 
 August 2026
 
     **********************************************************************
     *                                                                    *
-    *    © Craig J. Yasuna                                               *
+    *    (C) Craig J. Yasuna                                             *
     *      See Appendix for detailed Copyright Information               *
     *                                                                    *
     **********************************************************************
@@ -24,7 +24,7 @@ August 2026
     *    written by Craig J. Yasuna               (Mar 1991)             *
     *    adapted to MVS 3.8J: A. Philip Dickinson (Aug 2005)             *
     *                         Phil Roberts        (Apr 2011)             *
-    *                         Jürgen Winkelmann   (Apr 2011)             *
+    *                         Juergen Winkelmann  (Apr 2011)             *
     *                                                                    *
     **********************************************************************
     *                                                                    *
@@ -43,11 +43,11 @@ August 2026
 Introduction
 ------------
 
-The RAKF Security System is a RACF™-like MVS System Authorization Facility
-(SAF). RACF™ Version 1.7 facilities are emulated, except for the RACF™ database.
+The RAKF Security System is a RACF-like MVS System Authorization Facility
+(SAF). RACF Version 1.7 facilities are emulated, except for the RACF database
 Two tables, the users and the profiles table, are kept in storage. The actual
 security verifications are made by ICHSFR00, using these two tables. The
-formats of these users and profiles tables are compatible with RACF™ database
+formats of these users and profiles tables are compatible with RACF database
 entry data.
 
 Protection is achieved by routing all operating system or vendor product
@@ -84,7 +84,7 @@ used at all and thus will not work as expected.
 The way that protection will work on your system is entirely up to your
 control. Protection depends completely on the way you code the users and
 profiles tables. RAKF utilizes these tables for its protection decisions,
-instead of using a RACF™ database. Minimal tables to create a state equivalent
+instead of using a RACF database. Minimal tables to create a state equivalent
 to MVS without an active security product have been provided. Starting from
 these you should gradually move forward to tighten security as needed on your
 system.
@@ -110,7 +110,7 @@ repos releases and is automatically generated using generate_release.py
 python script. The most common arguments are:
 
 - --users use a custom users file instead of the default users.txt
-  (its plaintext passwords are hashed into the shadow file at generation time —
+  (its plaintext passwords are hashed into the shadow file at generation time  
   see *Password Hashing and the Shadow File*)
 - --profiles use a custom profiles file instead of the default profiles.txt
 - --xmit path to the admin-tool XMIT (default: newest APPLICATIONS/dist/*.xmit)
@@ -118,23 +118,18 @@ python script. The most common arguments are:
 - --no-tools generate the RAKF core only, without ADDUSER/ALTUSER
 
 The RAKF core (HLASM modules, macros, procs) ships as SMP source that MVS
-assembles and link-edits on-target. The ADDUSER/ALTUSER command processors,
-however, are C load modules built off-platform with the **cc370** toolchain —
-they cannot be assembled on MVS. They are therefore delivered *inline* as a TSO
-XMIT: generate_release.py emits the whole jobstream as **EBCDIC card images**
-and embeds the XMIT's raw bytes after a DD DATA card, which the install
-unpacks with RECEIVE + IEBCOPY.
+assembles and link-edits on-target.
 
 First build the tools (once, on a host with the cc370 toolchain installed):
 
-    cd APPLICATIONS && PATH=~/.local/bin:$PATH make package   # -> dist/*.xmit
+    cd APPLICATIONS && PATH=/.local/bin:$PATH make package   # -> dist/*.xmit
 
 Then generate the install file:
 
     python3 generate_release.py -u users.txt -p profiles.txt -o install_rakf.jcl
 
-Because the file now contains raw binary, submit it through the **EBCDIC
-pass-through reader** (device 001A, port 3506) — **not** the ASCII reader
+Because the file now contains raw binary, submit it through the EBCDIC
+pass-through reader (device 001A, port 3506)  NOT the ASCII reader
 3505, which would corrupt the binary:
 
     cat install_rakf.jcl | ncat --send-only -w1 127.0.0.1 3506
@@ -158,7 +153,7 @@ tables are members of the partitioned data set SYS1.SECURE.CNTL:
 - USERS: The RAKF users table
 - PROFILES: The RAKF profiles table
 
-:no_entry: **Warning**: each TSO user still needs a UADS entry to define the
+Warning: each TSO user still needs a UADS entry to define the
 TSO attributes and authorizations. These are not covered by the RAKF users
 table. See appendix B for an example job to add users on MVSCE and Jay Moseley
 sysgen.
@@ -171,7 +166,7 @@ SYS1.SECURE.CNTL and SYS1.SECURE.PWUP should be paid:
   for RAKF administration need UPDATE access to this dataset.
 - SYS1.SECURE.PWUP: started tasks need UPDATE access to this dataset.
 
-Passwords are **no longer stored in these datasets**. As of the salted
+Passwords are no longer stored in these datasets. As of the salted
 SHA-256 password hashing (see *Password Hashing and the Shadow File* below),
 each credential lives as a salted digest in a separate shadow file,
 SYS1.SECURE.SHADOW; the USERS password column is left blank. The control
@@ -200,20 +195,20 @@ you code other entries for the same facility, specifying different settings
 for each user group that will have special access (or denial of access) to
 that facility.
 
-Generally, only those features included in "IBM RACF™ Version 1.7" have been
+Generally, only those features included in "IBM RACF Version 1.7" have been
 emulated. RAKF uses the decision logic of the ESG Security System without
-modifications. The author of the ESG security system has referred to two RACF™
+modifications. The author of the ESG security system has referred to two RACF
 manuals during their planning. It is important for all users of RAKF to obtain
 these manuals also. These are needed in the security administration, which will
 be ongoing. The two manuals are:
 
-Manual             | Refere… | Description
+Manual             | Reference| Description
 -------------------+---------+-------------------------------------------------
-SPL RACF           | SC28-1… | Referred to for information how to write macros…
-RACF Administrato… | SC28-1… | Has an overview of profiles that should be used…
+SPL RACF           | SC28-1.  | Referred to for information how to write macros
+RACF Administrator | SC28-1.  | Has an overview of profiles that should be used
 
 You should try to find versions of these manuals being as close as possible to
-RACF™ Version 1.7 because later manuals describe features not available with
+RACF Version 1.7 because later manuals describe features not available with
 RAKF and/or MVS 3.8j.
 
 The profiles table is read from the bottom upwards which is the
@@ -222,7 +217,7 @@ in reverse order ensures to find the most significant hit for a resource or
 user search before any less significant hits, so tables search will always be
 stopped upon the first hit.
 
-### Users Table
+Users Table
 
 Below is an example USERS table:
 
@@ -258,37 +253,37 @@ managers who oversee the work of several programming groups. The
 multiple group arrangement gives these managers access to everything
 done by all the groups under them.
 
-> :information_source: **Passwords are no longer kept in the USERS table.**
-> The password column (columns 19–26) is left blank; the actual credential is a
+> Passwords are no longer kept in the USERS table.
+> The password column (columns 19-26) is left blank; the actual credential is
 > salted SHA-256 digest held in the shadow file (see below). The example above
 > shows the historical clear-text layout for reference only.
 
-### Password Hashing and the Shadow File
+Password Hashing and the Shadow File
 
 Earlier releases stored each password in clear text (obscured only by a
-reversible XOR "scramble"). Passwords are now protected with a **salted
-SHA-256** hash:
+reversible XOR "scramble"). Passwords are now protected with a salted
+SHA-256 hash:
 
     digest = SHA-256( salt || password )
 
-- **salt** — 8 bytes taken from the TOD clock (STCK) when the password is
+- salt - 8 bytes taken from the TOD clock (STCK) when the password is
   set, so two users with the same password get different digests and the hash
   cannot be pre-computed.
-- **password** — folded to upper case (as RACF folds passwords) before hashing,
+- password - folded to upper case (as RACF folds passwords) before hashing
   so enrollment and TSO/JOB-card sign-on agree.
-- **digest** — the raw 32-byte SHA-256 result.
+- digest - the raw 32-byte SHA-256 result.
 
-The salt and digest are stored in the shadow file **SYS1.SECURE.SHADOW**, a
+The salt and digest are stored in the shadow file SYS1.SECURE.SHADOW, a
 sequential RECFM=FB,LRECL=48 dataset with one 48-byte record per user:
 
  Bytes  | Field
 --------+--------------------------
-1 –  8  | USERID
-9 – 16  | Salt (8 bytes, binary)
-17 – 48 | SHA-256 digest (32 bytes)
+1 -  8  | USERID
+9 - 16  | Salt (8 bytes, binary)
+17 - 48 | SHA-256 digest (32 bytes)
 
-Keeping the digests in a *separate* dataset lets you lock it down harder than
-the rest of SYS1.SECURE.CNTL — it should be UACC(NONE) so that even reading
+Keeping the digests in a separate dataset lets you lock it down harder than
+the rest of SYS1.SECURE.CNTL   it should be UACC(NONE) so that even reading
 it (an offline dictionary attack) is denied to everyone but the RAKF
 administrator.
 
@@ -299,18 +294,18 @@ enrollment tools call the *same* routine, so a stored digest and a login
 attempt are compared byte-for-byte. RAKFUSER loads the shadow file into the
 in-core user table via the RAKFSHAD DD at IPL, alongside the USERS table.
 
-**Initial users are seeded at install time.** You still write plaintext
-passwords in the users.txt file (column 19–26, as shown above), but
+Initial users are seeded at install time. You still write plaintext
+passwords in the users.txt file (column 19-26, as shown above), but
 generate_release.py does not copy them onto the system. When it builds the
-install stream it hashes each password host-side — SHA-256 over the same
-EBCDIC bytes RAKF uses, so the result is identical to RAKFPWH — blanks the
+install stream it hashes each password host-side - SHA-256 over the same
+EBCDIC bytes RAKF uses, so the result is identical to RAKFPWH - blanks the
 USERS password column, and emits the shadow records into the stream, which
 the install loads into SYS1.SECURE.SHADOW. No clear-text password ever
 reaches the system, and no chicken-and-egg with the tools below: the initial
 credentials exist before ADDUSER/ALTUSER are ever run. (This means
-users.txt itself contains live credentials — keep it protected off-system.)
+users.txt itself contains live credentials (keep it protected off-system.)
 
-### Managing Users with ADDUSER, ALTUSER and DELUSER
+Managing Users with ADDUSER, ALTUSER and DELUSER
 
 Users are created and changed with two RACF-style command processors,
 ADDUSER and ALTUSER, installed in SYS2.CMDLIB. They write the USERS
@@ -318,49 +313,49 @@ member of SYS1.SECURE.CNTL and the SYS1.SECURE.SHADOW shadow file, and they
 discover those dataset names at run time by reading the RAKFUSER/RAKFPROF
 procs in SYS1.PROCLIB.
 
-    ADDUSER userid PASSWORD(pw) DFLTGRP(group) [GROUP(g2 g3 ...)] [OPERATIONS] 
+    ADDUSER userid PASSWORD(pw) DFLTGRP(group) [GROUP(g2 g3 ...)] [OPERATIONS]
            [SPECIAL]
-    ALTUSER userid [PASSWORD(pw)] [DFLTGRP(group)] [OPERATIONS|NOOPERATIONS] 
+    ALTUSER userid [PASSWORD(pw)] [DFLTGRP(group)] [OPERATIONS|NOOPERATIONS]
          [SPECIAL|NOSPECIAL]
 
     PASSWORD may be code as PWD, GROUP as GRP and DFLTGRP as DGRP.
 
-- **ADDUSER** adds one USERS line per group (the DFLTGRP line is flagged as
+- ADDUSER adds one USERS line per group (the DFLTGRP line is flagged as
   the default), generates a salt, hashes PASSWORD(pw), and writes the shadow
   record. PASSWORD and DFLTGRP are required; it fails if the user exists.
-- **ALTUSER** changes an existing user: PASSWORD re-hashes with a fresh salt,
+- ALTUSER changes an existing user: PASSWORD re-hashes with a fresh salt,
   DFLTGRP moves the default-group flag, and the flags toggle operations/special.
-- **DELUSER** removes a user from SYS1.SECURE.SHADOW and
+- DELUSER removes a user from SYS1.SECURE.SHADOW and
   SYS1.SECURE.CNTL(USERS).
 
-They run either as a **TSO command** (from a RAKF administrator's session)—
+They run either as a TSO command (from a RAKF administrator's session)
 
     ADDUSER SMITH PASSWORD(START123) DFLTGRP(USER)
 
-—or in **batch** under the terminal monitor, invoked with CALL so the load
+- or in batch under the terminal monitor, invoked with CALL so the load
 module is found in SYS2.CMDLIB (keep the command within column 72, using a
 TSO continuation + if needed):
 
     //ADDUSER  EXEC PGM=IKJEFT01
     //SYSTSPRT DD  SYSOUT=*
     //SYSTSIN  DD  *
-      ADDUSER +
-    'SMITH PASSWORD(START123) DFLTGRP(USER)'
+      ADDUSER 'SMITH PASSWORD(START123) DFLTGRP(USER)'
+    /*
 
 Because they update the RAKF-protected control datasets, run them under a
-userid connected to the **RAKFADM** group (they are ordinary problem-state
-programs — no APF authorization is required; the datasets' own protection is
+userid connected to the RAKFADM group (they are ordinary problem-state
+programs   no APF authorization is required; the datasets' own protection is
 the security boundary).
 
-After adding or altering a user, **reload the in-core tables** so the change
+After adding or altering a user, reload the in-core tables so the change
 takes effect, either from the console with S RAKFUSER (and S RAKFPROF for
 profile changes) or by running the RAKFUSER/RAKFPROF utilities in batch.
 Until the reload, the new or changed credential exists only on disk.
 
-> ⚠️ Commands like ADDSD, PERMIT and RDEFINE are not yet implemented
+> => Commands like ADDSD, PERMIT and RDEFINE are not yet implemented
 > The PROFILES definitions should be edited.
 
-### PROFILES table
+PROFILES table
 
 Below is an example PROFILES table:
 
@@ -547,7 +542,7 @@ Each line can be broken down as:
 
 The RAKFUSER and RAKFPROF utilities are used to create the in core users and
 profiles tables, respectively. Any user having access to these utilities can
-completely take over the system by activating “private” users and profiles
+completely take over the system by activating 'private' users and profiles
 tables, which is why these utilities need to be protected carefully. To prevent
 unauthorized use RAKFUSER and RAKFPROF request READ access to the RAKFADM
 profile in the FACILITY class. It is strongly recommended to define the RAKFADM
@@ -558,12 +553,12 @@ profiles table entries are provided as an example on how to do this:
     FACILITYRAKFADM                                     RAKFADM READ
     FACILITYRAKFADM                                     STCGROUPREAD
 
-This example defines a universal access of “none” (i.e. nobody has access
+This example defines a universal access of 'none' (i.e. nobody has access
 unless authorized explicitly) and explicitly authorizes user RAKFADM (or all
 members of group RAKFADM) and all started tasks (the STCGROUP).
 
-:no_entry: **Note that it is RAKF's standard behavior to grant ALTER access
-requested for an undefined resource**.
+Note that it is RAKF's standard behavior to grant ALTER access
+requested for an undefined resource.
 
 Thus everyone will be able to use the RAKFUSER and RAKFPROF utilities if there
 is no RAKFADM profile defined in the FACILITY class.
@@ -617,7 +612,7 @@ Security Authorization Facility (SAF) Support in MVS 3.8j
 
 RAKF supports security features that are used by MVS 3.8j differently than by
 later MVS versions or are not used at all and thus will not work as expected.
-The “historical” reason for this is that RAKF's predecessor ESG Security System
+The 'historical' reason for this is that RAKF's predecessor ESG Security Sys
 is dated 1991 which is 5 to 10 years later than most components of "current"
 MVS 3.8j systems. Some of the issues resulting from this discrepancy are
 discussed here.
@@ -632,17 +627,17 @@ should be denied by that profile. Only if it then really gets denied, you can
 be sure that the corresponding hook to call the SAF is already implemented in
 the level of MVS you are running.
 
-The most relevant of these classes is the **PROGRAM** class which is meant
+The most relevant of these classes is the PROGRAM class which is meant
 to be used to protect programs from being executed by unauthorized users: RAKF
 will accept profiles in the PROGRAM class flawlessly but none of the programs
 defined there will be protected because MVS 3.8j simply doesn't ask the SAF
 for permission before executing a program.
 
-Therefore, with MVS 3.8j one has to make sure that “critical” programs
+Therefore, with MVS 3.8j one has to make sure that 'critical' programs
 cannot be executed by unauthorized users through other means. The following
 solutions might be feasible on a case by case basis:
 
-***Programs that need to call a specific SVC for successful execution:***
+Programs that need to call a specific SVC for successful execution:
 
 Introduce a profile in the FACILITY class and have that SVC verify the
 caller's authorization against this profile. This method can only be used, if
@@ -654,7 +649,7 @@ commands to access supervisor state easily. As it is completely unsecured its
 use as provided in TK3 can only be recommended for single user systems. Systems
 with security present typically aren't single user systems but still have
 requirements to allow certain utilities supervisor access when used by
-authorized users (sysprogs, etc.), but not when used by “normal” users. For
+authorized users (sysprogs, etc.), but not when used by 'normal' users. For
 this reason a modification to SVC 244 was made to have it check the calling
 user's
 authority to access profile SVC244 in the FACILITY class before allowing
@@ -665,7 +660,7 @@ distributed with RAKF. If you are running a Tur(n)key MVS system having the
 unsecured version of this SVC installed, it is strongly recommended to replace
 it by installing the usermod in Appendix D.
 
-***Programs with source code available:***
+Programs with source code available:
 
 Introduce a profile in the FACILITY class and have the program verify the
 caller's authorization against this profile. This method of course provides a
@@ -683,7 +678,7 @@ utilities can effectively be restricted by defining profile RAKFADM in the
 FACILITY class and giving only authorized users or groups READ access to this
 profile.
 
-***Programs without source code available:***
+Programs without source code available:
 
 Create a separate loadlib protected by a DATASET profile and place the program
 there. This, of course, is kind of a last resort.
@@ -713,7 +708,7 @@ system being active as most accesses will then be denied. Consequently the RACF
 indicators of all datasets, catalogs and VSAM objects explicitly need to be
 turned off prior to removing RAKF from the system.
 
-The section “Turning the RACF Indicator On or Off” below outlines how to
+The section 'Turning the RACF Indicator On or Off' below outlines how to
 manipulate the RACF indicator of datasets, catalogs or VSAM objects,
 individually or for the whole system. Using these procedures clearly is the
 recommended way to enable dataset protection.
@@ -721,7 +716,7 @@ recommended way to enable dataset protection.
 Turning the RACF Indicator On or Off
 ------------------------------------
 
-### Setting or Clearing the RACF Indicator of a Single Non-VSAM Dataset
+Setting or Clearing the RACF Indicator of a Single Non-VSAM Dataset
 
 - Logon to TSO and enter the following command: CDSCB 'datasetname' VOL(vvvvvv)
   UNIT(SYSDA) SHR racind
@@ -741,13 +736,13 @@ The RACF indicator of the following datasets must never be set:
 - Temporary datasets, i.e. datasets with the following naming format:
   SYSnnnnn.Tnnnnnn.RAnnn.*, where each n represents a decimal digit.
 
-### Setting or Clearing the RACF Indicator of a Single Catalog or VSAM Object
+Setting or Clearing the RACF Indicator of a Single Catalog or VSAM Object
 
 Each component of a catalog or VSAM object has its own RACF indicator bit in
 its catalog entry. The following requirements must be observed when setting
 or clearing the RACF indicators of catalogs or VSAM objects:
 
-- **Catalog**: Only the RACF indicator of the catalog's cluster entry is to be
+- Catalog: Only the RACF indicator of the catalog's cluster entry is to be
   set or cleared. The RACF indicators of the catalog's data and index components
   must never be set.
 - All other VSAM objects: The RACF indicator of the object's catalog entry, as
@@ -778,14 +773,14 @@ follows:
 - RACON sets the RACF indicator of the entry specified
 - RACOFF clears the RACF indicator of the entry specified
 
-A line starting with an asterisk (“*”) is treated as a comment. Any number of
+A line starting with an asterisk (c'*') is treated as a comment. Any number of
 control statements is allowed, but no RACON or RACOFF statement is accepted
 until a valid CATALOG statement has been executed. See Appendix E demonstrating
 the use of the RACIND utility.
 
-### Setting RACF Indicator for all el
+Setting RACF Indicator for all el
 
-### Setting or Clearing the RACF Indicator of All Eligible Non-VSAM Datasets
+Setting or Clearing the RACF Indicator of All Eligible Non-VSAM Datasets
 
 To view the current RACF indicator status you can run the progam VTOC
 (included in the AUX folder) with the following syntax:
@@ -811,7 +806,7 @@ not:
 - Temporary datasets, i.e. datasets with the following naming format:
   SYSnnnnn.Tnnnnnn.RAnnn.*, where each n represents a decimal digit.
 
-### Setting or Clearing the RACF Indicator of All Catalogs and VSAM Objects
+Setting or Clearing the RACF Indicator of All Catalogs and VSAM Objects
 
 To view the current RACF indicator status of all catalogs and VSAM objects in
 the system submit job VSAMLRAC.jcl located in the TOOLS folder. This job
@@ -833,7 +828,7 @@ considered eligible.
 Auxiliary Utilities
 -------------------
 
-Section “Turning the RACF Indicator On or Off” outlines procedures for setting
+Section 'Turning the RACF Indicator On or Off' outlines procedures for setti
 or clearing the RACF indicator of datasets, catalogs and VSAM objects which is
 crucial to provide a reliable dataset protection. These procedures make use of
 set of utilities that are neither part of the RAKF product nor of native MVS
@@ -846,21 +841,21 @@ sources and are provided with the RAKF in the AUX folder. This includes:
 Version History
 ---------------
 
-### ESG Security System (March 1991)
+ESG Security System (March 1991)
 
 The ESG Security System was published by Craig J. Yasuna as an alternative to
-IBM's RACF™ and similar products. It uses the ICHRTX00 security router exit to
+IBM's RACF and similar products. It uses the ICHRTX00 security router exit to
 communicate its security decisions to MVS. ICHRTX00 is a user exit of the SAF
 router ICHSFR00.
 
-### RAKF "RAcK oF" Security System (August 2005)
+RAKF "RAcK oF" Security System (August 2005)
 
 RAKF was published by A. Philip Dickinson as an adaption of the ESG Security
 System to MVS 3.8j. The ESG Security doesn't natively support MVS 3.8j for
 several reasons. The major ones are:
 
-- At MVS 3.8j times the SAF router ICHSFR00 was part of the RACF™ product and
-  thus not available on MVS systems without RACF™ being installed. So the
+- At MVS 3.8j times the SAF router ICHSFR00 was part of the RACF product and
+  thus not available on MVS systems without RACF being installed. So the
   ICHRTX00 exit as a convenient place for third party security products to hook
   into the SAF didn't exist.
 - incompatible ACEE handling.
@@ -888,7 +883,7 @@ MVS 3.8j:
   way that with some trial and error any user is able to acquire ALTER access to
   any dataset in the system.
 
-### RAKF 1.2.0 (April 2011)
+RAKF 1.2.0 (April 2011)
 
 When the above mentioned problems became visible and identified as being RAKF
 caused in several MVS 3.8j environments it turned out that Phil D's RAKF source
@@ -896,35 +891,35 @@ wasn't accessible any more (lost in a package crate from moving). Phil Roberts
 stepped in and reconstructed the source by disassembling Phil D's binary RAKF
 distribution and comparing it with the original source of the ESG Security
 System. Based on that reconstructed source the rest of the incompatibilities
-listed above were identified and corrected by Jürgen Winkelmann.
+listed above were identified and corrected by Juergen Winkelmann.
 
 To avoid another loss of the source to occur an additional effort has been made
 to clean up the source to a publishable state and to provide an SMP4 compatible
 source distribution enabling RAKF installation using the standard SMP 4
 standard RECEIVE, APPLY, ACCEPT procedure.
 
-### RAKF 1.2.0 PTF Summary
+RAKF 1.2.0 PTF Summary
 
 The following PTFs are available:
 
-- **RRKF001**: Enable comment lines (lines starting with * ) to be entered in
+- RRKF001: Enable comment lines (lines starting with * ) to be entered in
   the source users and profiles tables and minor bug fixes in RAKFUSER utility.
-- **RRKF002**: Enhance RACINIT NEWPASS functionality to support permanent
+- RRKF002: Enhance RACINIT NEWPASS functionality to support permanent
   password changes to be initiated by an application. This enables standard
   password change functionality as for example entering currentpw/newpw on the
-  “ENTER CURRENT PASSWORD for uuuuuuu” at TSO logon time.
-- **RRKF003**: Security enhancement in users and profiles tables processing.
-- **RRKF004**: Consolidation of documentation members from RAKF's SAMPLIB to the
+  'ENTER CURRENT PASSWORD for uuuuuuu' at TSO logon time.
+- RRKF003: Security enhancement in users and profiles tables processing.
+- RRKF004: Consolidation of documentation members from RAKF's SAMPLIB to the
   RAKF User's Guide.
-- **RRKF005**: Introduce the RACIND utility to control VSAM RACF indicators.
-- **RRKF006**: Sample jobs and utilities to turn the RACF indicator on or off
+- RRKF005: Introduce the RACIND utility to control VSAM RACF indicators.
+- RRKF006: Sample jobs and utilities to turn the RACF indicator on or off
   for all non-VSAM datasets, catalogs and VSAM objects. Sample jobs to create
   the profiles and users tables and the password update queue. Documentation
   changes and minor bug fixes.
   These PTFs are available in folder files/RAKF/PTFs of the H390-MVS Yahoo group
   and in CBT file 850, future PTFs will be made available at the same locations.
 
-### RAKF 1.2.6 (October 2021)
+RAKF 1.2.6 (October 2021)
 
 To make source management more open and to make RAKF more aproachable all PTFs
 were combined to have a unified source repository. The following changes were
@@ -942,14 +937,14 @@ also made:
 - Updated RACIND.hlasm to check if RAKF is installed and if not to skip RACHECK,
   this is helpful for installing before RAKF is enabled.
 
-### RAKF 2.0.0 (August 2026)
+RAKF 2.0.0 (August 2026)
 
 Passwords are no longer stored in the clear. This is a breaking change to the
 USERS table: the password column is now blank and the credential lives in
 SYS1.SECURE.SHADOW, so anything that read a password out of USERS must be
 changed.
 
-- Salted **SHA-256** password hashing. RAKFHASH is pure S/370 HLASM,
+- Salted SHA-256 password hashing. RAKFHASH is pure S/370 HLASM,
   validated against the NIST FIPS 180-4 vectors; RAKFPWH wraps it as
   SHA256(salt || password). The sign-on path (ICHSFR00) and the
   administration tools call the same routine, so a stored digest and a login
