@@ -859,10 +859,11 @@ smp_dict = {
         'MACLIB': "++MAC({}) DISTLIB(AMACLIB)  SYSLIB(MACLIB).",
         'SRCLIB': "++SRC({}) DISTLIB(ASRCLIB)  SYSLIB(SRCLIB).",
         'PROCLIB': "++MAC({}) DISTLIB(APROCLIB) SYSLIB(PROCLIB).",
-        'PARMLIB': "++MAC({}) DISTLIB(APARMLIB) SYSLIB(PARMLIB)."
+        'PARMLIB': "++MAC({}) DISTLIB(APARMLIB) SYSLIB(PARMLIB).",
+        'SAMPLIB': "++MAC({}) DISTLIB(ASAMPLIB) SYSLIN(SAMPLIB)."
         }
 
-folders = ["MACLIB", "SRCLIB", "PROCLIB", "PARMLIB"]
+folders = ["MACLIB", "SRCLIB", "PROCLIB", "PARMLIB", "SAMPLIB"]
 
 for folder in folders:
     fileList = os.listdir("{}/{}".format(running_folder, folder))
