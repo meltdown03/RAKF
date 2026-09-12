@@ -77,7 +77,7 @@ DO I = 2 TO INDATA.0
         SAY '*** SKIPPING TEMP DATA SET' DATASET '('||STRIP(VOLUME)||')'        
         ITERATE                                                                 
     END                                                                         
-
+                                                                                
     IF SUBSTR(DATASET,1,1) = "1" THEN                                           
         DATASET = SUBSTR(DATASET,2)                                             
                                                                                 
