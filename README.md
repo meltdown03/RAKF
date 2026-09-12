@@ -120,12 +120,7 @@ python script. The most common arguments are:
 - `--no-tools` generate the RAKF core only, without `ADDUSER`/`ALTUSER`
 
 The RAKF core (HLASM modules, macros, procs) ships as SMP source that MVS
-assembles and link-edits on-target. The `ADDUSER`/`ALTUSER` command processors,
-however, are C load modules built off-platform with the **cc370** toolchain —
-they cannot be assembled on MVS. They are therefore delivered *inline* as a TSO
-XMIT: `generate_release.py` emits the whole jobstream as **EBCDIC card images**
-and embeds the XMIT's raw bytes after a `DD DATA` card, which the install
-unpacks with `RECEIVE` + `IEBCOPY`.
+assembles and link-edits on-target.
 
 First build the tools (once, on a host with the cc370 toolchain installed):
 
