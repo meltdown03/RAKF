@@ -1,0 +1,127 @@
+//VTOCSRAC JOB (RACIND),                                                        
+//             'SET RACF INDICATOR',                                            
+//             CLASS=A,REGION=4M,                                               
+//             MSGCLASS=X,                                                      
+//             MSGLEVEL=(1,1)                                                   
+//********************************************************************          
+//*                                                                             
+//* NAME: VTOCSRAC                                                              
+//*                                                                             
+//* DESC: SET RACF INDICATOR IN VTOC ON OR OFF FOR ALL DATASETS                 
+//*       ON ALL ONLINE DASDS EXCEPT:                                           
+//*       - ALL VSAM DATASPACES                                                 
+//*       - ALL TEMPORARY DATASETS SYSNNNNN.TNNNNNN.RANNN                       
+//*       - THE PASSWORD DATASET                                                
+//*                                                                             
+//* NOTE: IF DASD VOLUMES ARE PRESENT IN YOUR SYSTEM THAT SHOULD NOT            
+//* ----- BE MODIFIED (I.E. IPL AND SPOOL VOLUMES FOR OTHER SYSTEMS             
+//*       LIKE START1 AND SPOOL0 IN TK3 SYSTEMS), THESE SHOULD BE               
+//*       VARIED OFFLINE BEFORE SUBMITTING THIS JOB.                            
+//*                                                                             
+//*       CHANGE BREXX.CURRENT.RXLIB IN THE CURRENT BREXX RXLIB                 
+//*                                                                             
+//* REQUIREMENTS: BREXX V2R5M2 OR GREATER MUST BE INSTALLED                     
+//*                                                                             
+//********************************************************************          
+//VTOCB4   EXEC PGM=IKJEFT01,DYNAMNBR=20                                        
+//VTOCOUT  DD SYSOUT=*                                                          
+//SYSTSPRT DD DUMMY                                                             
+//SYSTSIN  DD *                                                                 
+VTOC ALL LIM(DSO NE VS) P(NEW (DSN V RA)) S(RA,D,DSN,A) -                       
+  LIN(66) H('1RACF STATUS BEFORE CHANGE')                                       
+/*                                                                              
+//* **********************************************************                  
+//LSTVTOC EXEC PGM=IKJEFT01,DYNAMNBR=20                                         
+//SYSTSPRT DD DSN=&&LISTCC,DISP=(,PASS),UNIT=VIO,SPACE=(TRK,(5,5))              
+//SYSTSIN  DD *                                                                 
+VTOC ALL LIM(DSO NE VS) P(NEW (DSN V)) S(DSN A) NOH                             
+/*                                                                              
+//* **********************************************************                  
+//MAKEREXX EXEC PGM=IEBGENER                                                    
+//SYSPRINT DD SYSOUT=*                                                          
+//SYSIN DD DUMMY                                                                
+//SYSUT1    DD *                                                                
+PARSE ARG RACF .                                                                
+SAY ''                                                                          
+SAY '******************************************'                                
+SAY '* REXX SCRIPT TO GENERATE CDSCB COMMANDS *'                                
+SAY '******************************************'                                
+SAY ''                                                                          
+SAY '*** SETTING RACF INDICATOR TO' RACF                                        
+SAY '*** PROCESSING VTOC OUTPUT'                                                
+                                                                                
+"EXECIO * DISKR INDD (FINIS STEM INDATA."                                       
+IF RC > 0 THEN DO                                                               
+    SAY "(T_T) ERROR READING SYSUT1:" RC                                        
+    EXIT 1                                                                      
+END                                                                             
+SAY '*** NUMBER OF ENTRIES' INDATA.0 - 2                                        
+TOTAL = 1                                                                       
+DO I = 2 TO INDATA.0                                                            
+    IF INDATA.I = 'END' THEN ITERATE                                            
+                                                                                
+    IF SUBSTR(INDATA.I,3,6) = 'TOTALS' & INDEX(INDATA.I,'.') = 0 THEN           
+        ITERATE                                                                 
+                                                                                
+    PARSE VAR INDATA.I DATASET VOLUME                                           
+                                                                                
+    /* DO NOT RACF INDICATE TEMP DATASET */                                     
+                                                                                
+    PARSE VAR DATASET FIRST '.' SECOND '.' THIRD '.' .                          
+                                                                                
+    SYS = DATATYPE(SUBSTR(FIRST,4),W)                                           
+    T = DATATYPE(SUBSTR(SECOND,2),W)                                            
+    RA = DATATYPE(SUBSTR(THIRD,3),W)                                            
+                                                                                
+    IF (SYS &  T & RA) | 'PASSWORD' = DATASET THEN DO                           
+        SAY '*** SKIPPING TEMP DATA SET' DATASET '('||STRIP(VOLUME)||')'        
+        ITERATE                                                                 
+    END                                                                         
+
+    IF SUBSTR(DATASET,1,1) = "1" THEN                                           
+        DATASET = SUBSTR(DATASET,2)                                             
+                                                                                
+    OUTCDSCB.TOTAL = "CDSCB '"||DATASET||"' V("||,                              
+         STRIP(VOLUME)        ||,                                               
+         ") UN(SYSALLDA) SHR" RACF                                              
+    DROP INDATA.I                                                               
+                                                                                
+    TOTAL = TOTAL + 1                                                           
+END                                                                             
+                                                                                
+DROP INDATA.0                                                                   
+                                                                                
+SAY "***" TOTAL "AVAILABLE DATASETS"                                            
+                                                                                
+OUTCDSCB.0 = TOTAL - 1                                                          
+                                                                                
+"EXECIO * DISKW OUTDD (STEM OUTCDSCB. FINIS"                                    
+                                                                                
+SAY "*** DONE"                                                                  
+SAY ''                                                                          
+/*                                                                              
+//SYSUT2   DD DSN=&&RACIND,DISP=(,PASS),UNIT=VIO,                               
+//            SPACE=(TRK,(5,5))                                                 
+//* **********************************************************                  
+//* CHANGE RACF BELOW TO NORACF TO REMOVE RACF INDICATOR                        
+//EXEC     EXEC PGM=BREXX,PARM='RXRUN RACF',REGION=8192K                        
+//RXRUN    DD   DSN=&&RACIND,DISP=SHR                                           
+//RXLIB    DD   DSN=BREXX.CURRENT.RXLIB,DISP=SHR                                
+//STDIN    DD   DUMMY                                                           
+//INDD     DD   DSN=&&LISTCC,DISP=SHR                                           
+//OUTDD    DD   DSN=&&CDSCB,DISP=(,PASS),UNIT=VIO,SPACE=(TRK,(5,5)),            
+//         DCB=(LRECL=80,BLKSIZE=800,RECFM=FB)                                  
+//STDOUT   DD   SYSOUT=*,DCB=(RECFM=FB,LRECL=140,BLKSIZE=5600)                  
+//STDERR   DD   SYSOUT=*,DCB=(RECFM=FB,LRECL=140,BLKSIZE=5600)                  
+//* **********************************************************                  
+//RACINDVT EXEC PGM=IKJEFT01,DYNAMNBR=20                                        
+//SYSTSPRT DD SYSOUT=*                                                          
+//SYSTSIN  DD DSN=&&CDSCB,DISP=(OLD,DELETE)                                     
+//* **********************************************************                  
+//VTOCAFTR EXEC PGM=IKJEFT01,DYNAMNBR=20                                        
+//VTOCOUT  DD SYSOUT=*                                                          
+//SYSTSPRT DD DUMMY                                                             
+//SYSTSIN  DD *                                                                 
+VTOC ALL LIM(DSO NE VS) P(NEW (DSN V RA)) S(RA,D,DSN,A) -                       
+  LIN(66) H('1RACF STATUS AFTER CHANGE')                                        
+/*                                                                              
