@@ -3,7 +3,7 @@ RAKF VERSION 2 RELEASE 0 MODIFICATION 0
 
 A Security System for MVS 3.8j
 
-User’s Guide
+User's Guide
 ------------
 
 > **Important**
@@ -34,8 +34,8 @@ August 2026
     *                                                                    *
     **********************************************************************
     *                                                                    *
-    * The information in this User’s Guide is adapted from the original  *
-    * ESG Security System’s documentation as prepared by Sam Golob in    *
+    * The information in this User's Guide is adapted from the original  *
+    * ESG Security System's documentation as prepared by Sam Golob in    *
     * 1991.                                                              *
     *                                                                    *
     **********************************************************************
@@ -77,7 +77,7 @@ with by any other password mechanisms in MVS.
 
 Additionally it should be noted that the ESG Security System, which RAKF is
 based on, had been developed in 1991 for MVS versions released 5 to 10 years
-later than RAKF’s target MVS 3.8j. Consequently RAKF supports security features
+later than RAKF's target MVS 3.8j. Consequently RAKF supports security features
 that are used by MVS 3.8j differently than by later MVS versions or are not
 used at all and thus will not work as expected.
 
@@ -152,7 +152,7 @@ Customization
 
 The RAKF security configuration is defined by the RAKF users table and the RAKF
 profiles table, which are text files maintained by the security administrator
-to define the system’s users, groups, resources and their protection. These
+to define the system's users, groups, resources and their protection. These
 tables are members of the partitioned data set SYS1.SECURE.CNTL:
 
 - USERS: The RAKF users table
@@ -562,7 +562,7 @@ This example defines a universal access of “none” (i.e. nobody has access
 unless authorized explicitly) and explicitly authorizes user RAKFADM (or all
 members of group RAKFADM) and all started tasks (the STCGROUP).
 
-:no_entry: **Note that it is RAKF’s standard behavior to grant ALTER access
+:no_entry: **Note that it is RAKF's standard behavior to grant ALTER access
 requested for an undefined resource**.
 
 Thus everyone will be able to use the RAKFUSER and RAKFPROF utilities if there
@@ -608,7 +608,7 @@ recommended to install an IKFEFF10 user exit that automatically provides these
 parameters for jobs submitted using the TSO submit command processor and to
 configure RPF to use TSO submit instead of RPF submit (this is installed by
 default on MVSCE and Jay Moseley sysgen systems). That way the majority of
-jobs submitted in day to day system usage don’t need to code these parameters
+jobs submitted in day to day system usage don't need to code these parameters
 on their JOB cards. The usermod that supplies this feature is ZP60034,
 available at https://www.prycroft6.com.au/vs2mods/#zp60034.
 
@@ -645,18 +645,18 @@ solutions might be feasible on a case by case basis:
 ***Programs that need to call a specific SVC for successful execution:***
 
 Introduce a profile in the FACILITY class and have that SVC verify the
-caller’s authorization against this profile. This method can only be used, if
+caller's authorization against this profile. This method can only be used, if
 the SVC in question is specific enough to the calling program, so that no other
 system functions get broken when access to that SVC is restricted.
 An example for this method is SVC 244: This SVC is originally provided with the
 Tur(n)key MVS System, where it is used to enable certain utilities and TSO
 commands to access supervisor state easily. As it is completely unsecured its
 use as provided in TK3 can only be recommended for single user systems. Systems
-with security present typically aren’t single user systems but still have
+with security present typically aren't single user systems but still have
 requirements to allow certain utilities supervisor access when used by
 authorized users (sysprogs, etc.), but not when used by “normal” users. For
 this reason a modification to SVC 244 was made to have it check the calling
-user’s
+user's
 authority to access profile SVC244 in the FACILITY class before allowing
 authorization. This way SVC 244 is turned from a big security hole to an
 efficient means of protecting utilities that need to run authorized.
@@ -678,7 +678,7 @@ USERS and PROFILES tables are critical in the sense that anyone having access
 to them can take over the security administration of the whole system and thus
 can conduct arbitrary fraudulent activities. To enable control over who is
 authorized to use these utilities they request READ access to FACILITY RAKFADM
-and don’t execute if this access isn’t granted. That way the use of these
+and don't execute if this access isn't granted. That way the use of these
 utilities can effectively be restricted by defining profile RAKFADM in the
 FACILITY class and giving only authorized users or groups READ access to this
 profile.
@@ -747,11 +747,11 @@ Each component of a catalog or VSAM object has its own RACF indicator bit in
 its catalog entry. The following requirements must be observed when setting
 or clearing the RACF indicators of catalogs or VSAM objects:
 
-- **Catalog**: Only the RACF indicator of the catalog’s cluster entry is to be
-  set or cleared. The RACF indicators of the catalog’s data and index components
+- **Catalog**: Only the RACF indicator of the catalog's cluster entry is to be
+  set or cleared. The RACF indicators of the catalog's data and index components
   must never be set.
-- All other VSAM objects: The RACF indicator of the object’s catalog entry, as
-  well as the RACF indicators of the object’s component catalog entries must be
+- All other VSAM objects: The RACF indicator of the object's catalog entry, as
+  well as the RACF indicators of the object's component catalog entries must be
   set or cleared synchronously.
 
 To set or clear the RACF indicator of any catalog entry (the catalog cluster
@@ -914,8 +914,8 @@ The following PTFs are available:
   password change functionality as for example entering currentpw/newpw on the
   “ENTER CURRENT PASSWORD for uuuuuuu” at TSO logon time.
 - **RRKF003**: Security enhancement in users and profiles tables processing.
-- **RRKF004**: Consolidation of documentation members from RAKF’s SAMPLIB to the
-  RAKF User’s Guide.
+- **RRKF004**: Consolidation of documentation members from RAKF's SAMPLIB to the
+  RAKF User's Guide.
 - **RRKF005**: Introduce the RACIND utility to control VSAM RACF indicators.
 - **RRKF006**: Sample jobs and utilities to turn the RACF indicator on or off
   for all non-VSAM datasets, catalogs and VSAM objects. Sample jobs to create
