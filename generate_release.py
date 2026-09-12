@@ -3,11 +3,9 @@
 # Generate the RAKF install job stream.
 #
 # The RAKF core (HLASM modules, procs, macros) ships as SMP source that MVS
-# assembles/link-edits on-target -- pure text.  The administration tools
-# ADDUSER/ALTUSER are cc370-built C *load modules* that cannot be assembled
-# on MVS, so they are delivered here as an inline TSO XMIT: the whole stream
-# is emitted as EBCDIC card images and the XMIT's raw bytes are embedded
-# after a `DD DATA,DLM=` card, installed on-target with RECEIVE + IEBCOPY.
+# assembles/link-edits on-target. An optional externally supplied command-library
+# XMIT can be embedded after a `DD DATA,DLM=` card and installed on-target
+# with RECEIVE + IEBCOPY.
 #
 # Because the file now contains raw binary, submit it through the EBCDIC
 # pass-through reader (device 001A / port 3506), NOT the ASCII reader 3505:
@@ -15,7 +13,6 @@
 #
 import os
 import sys
-import glob
 import hashlib
 import argparse
 
@@ -23,11 +20,11 @@ arg_parser = argparse.ArgumentParser()
 arg_parser.add_argument('-u', '--users', help="Custom users file", default=False)
 arg_parser.add_argument('-p', '--profiles', help="Custom profiles file", default=False)
 arg_parser.add_argument('-x', '--xmit', default=None,
-                        help="TSO XMIT of the admin tools (default: newest APPLICATIONS/dist/*.xmit)")
+                        help="External command-library TSO XMIT")
 arg_parser.add_argument('-o', '--output', default=None,
                         help="Output file (binary EBCDIC card images). Default: stdout.")
 arg_parser.add_argument('--cmdlib', default="SYS2.CMDLIB",
-                        help="Target library for the ADDUSER/ALTUSER programs")
+                        help="Target library for external XMIT members")
 arg_parser.add_argument('--helplib', default="SYS2.HELP",
                         help="Target help library for the ADDUSER/ALTUSER HELP members")
 arg_parser.add_argument('--volume', default="PUB000",
@@ -35,9 +32,9 @@ arg_parser.add_argument('--volume', default="PUB000",
 arg_parser.add_argument('--codepage', default="cp037",
                         help="EBCDIC codepage for card images (cp037 or cp1047)")
 arg_parser.add_argument('--no-tools', action="store_true",
-                        help="Emit the RAKF core only, without the admin tools")
+                        help="Do not embed an external XMIT")
 arg_parser.add_argument('--recv370', action="store_true",
-                        help="Unpack the admin-tool XMIT with RECV370 (SYSC.LINKLIB) "
+                        help="Unpack the external XMIT with RECV370 (SYSC.LINKLIB) "
                              "instead of TSO RECEIVE. Needed when RAKF is installed "
                              "during a sysgen, before the TSO XMIT facility exists.")
 arg_parser.add_argument('--shadow-recovery', action='store_true',
@@ -723,17 +720,10 @@ def emit_rakfcust(filename, inserts):
 
 
 # ------------------------------------------------------------------ #
-#  Inline the admin-tool XMIT (raw binary) into the stream.          #
+#  Inline an external command-library XMIT (raw binary) into stream. #
 # ------------------------------------------------------------------ #
 def find_xmit():
-    if args.xmit:
-        return args.xmit
-    cands = sorted(glob.glob(os.path.join(running_folder, "APPLICATIONS", "dist", "*.xmit")),
-                   key=os.path.getmtime)
-    if not cands:
-        cands = sorted(glob.glob(os.path.join(running_folder, "APPLICATIONS", "build", "*.xmit")),
-                       key=os.path.getmtime)
-    return cands[-1] if cands else None
+    return args.xmit
 
 
 def pick_dlm(xmit_bytes):
@@ -748,6 +738,59 @@ def pick_dlm(xmit_bytes):
 
 # Also a continuation of RAKFINST, for the same reason as SHADOW_LOAD above:
 # separate jobs run on separate initiators and race the install they depend on.
+TOOLS_HEADER = """//*******************************************************************
+//* Install an externally supplied RAKF command-library XMIT.
+//* The inline TSO XMIT is staged from the EBCDIC card reader, then
+//* installed with RECEIVE + IEBCOPY into {cmdlib}.
+//*******************************************************************
+//DELOLD  EXEC PGM=IDCAMS
+//SYSPRINT DD SYSOUT=*
+//SYSIN    DD *
+  DELETE RAKF.TOOLS.XMIT    SCRATCH PURGE
+  DELETE RAKF.TOOLS.LINKLIB SCRATCH PURGE
+  SET MAXCC=0
+//* --- stage the inline XMIT binary into an FB80 dataset -----------
+//STAGE   EXEC PGM=IEBGENER
+//SYSPRINT DD SYSOUT=*
+//SYSIN    DD DUMMY
+//SYSUT2   DD DSN=RAKF.TOOLS.XMIT,DISP=(,CATLG,DELETE),
+//            UNIT=SYSDA,VOL=SER={vol},SPACE=(TRK,(200,50)),
+//            DCB=(RECFM=FB,LRECL=80,BLKSIZE=3120)
+//SYSUT1   DD DATA,DLM='{dlm}'"""
+
+TOOLS_RECV_TSO = """//* --- RECEIVE the XMIT into a transient load library -------------
+//RECV    EXEC PGM=IKJEFT01,DYNAMNBR=50
+//SYSTSPRT DD SYSOUT=*
+//SYSTSIN  DD *
+  RECEIVE INDSN('RAKF.TOOLS.XMIT') DATASET('RAKF.TOOLS.LINKLIB')"""
+
+TOOLS_RECV_370 = """//* --- unXMIT into a transient load library with RECV370 ----------
+//RECV    EXEC PGM=RECV370,REGION=4096K
+//STEPLIB  DD DISP=SHR,DSN=SYSC.LINKLIB
+//RECVLOG  DD SYSOUT=*
+//XMITIN   DD DSN=RAKF.TOOLS.XMIT,DISP=SHR
+//SYSPRINT DD SYSOUT=*
+//SYSUT1   DD DSN=&&RECVWRK,UNIT=SYSDA,VOL=SER={vol},
+//            SPACE=(CYL,(10,10)),DISP=(NEW,DELETE,DELETE)
+//SYSUT2   DD DSN=RAKF.TOOLS.LINKLIB,DISP=(,CATLG,DELETE),
+//            UNIT=SYSDA,VOL=SER={vol},SPACE=(CYL,(5,5,20),RLSE),
+//            DCB={cmdlib}
+//SYSIN    DD DUMMY"""
+
+TOOLS_INSTALL = """//* --- copy the tool members into the command library ------------
+//INSTALL EXEC PGM=IEBCOPY
+//SYSPRINT DD SYSOUT=*
+//IN       DD DSN=RAKF.TOOLS.LINKLIB,DISP=SHR
+//OUT      DD DSN={cmdlib},DISP=SHR
+//SYSIN    DD *
+  COPY OUTDD=OUT,INDD=((IN,R))
+//* --- clean up the staging datasets -----------------------------
+//CLEANUP EXEC PGM=IDCAMS
+//SYSPRINT DD SYSOUT=*
+//SYSIN    DD *
+  DELETE RAKF.TOOLS.XMIT    SCRATCH PURGE
+  DELETE RAKF.TOOLS.LINKLIB SCRATCH PURGE
+  SET MAXCC=0"""
 
 HELP_HEADER = """//* --- TSO HELP members for the admin commands -------------------
 //HELPLOAD EXEC PGM=PDSLOAD
@@ -784,6 +827,33 @@ def emit_help():
                              "columns:\n  {}".format(m, line))
                 emit(line)
     emit("/*")
+
+
+def emit_tools():
+    """Embed an explicitly supplied FB80 XMIT and install its members."""
+    xmit_path = find_xmit()
+    if not xmit_path or not os.path.isfile(xmit_path):
+        sys.exit("generate_release.py: external XMIT not found: {}"
+                 .format(xmit_path))
+    with open(xmit_path, 'rb') as f:
+        xmit = f.read()
+    if len(xmit) % 80 != 0:
+        sys.exit("generate_release.py: XMIT is not FB80 (len {} is not a multiple "
+                 "of 80).".format(len(xmit)))
+    dlm = pick_dlm(xmit)
+    sys.stderr.write("[gen] embedding {} ({} bytes, DLM={})\n"
+                     .format(xmit_path, len(xmit), dlm))
+    (emit_guarded_text if args.upgrade else emit_text)(
+        TOOLS_HEADER.format(cmdlib=args.cmdlib, vol=args.volume, dlm=dlm))
+    OUT.extend(xmit)
+    emit(dlm)
+    recv = TOOLS_RECV_370 if args.recv370 else TOOLS_RECV_TSO
+    sys.stderr.write("[gen] unXMIT step: {}\n"
+                     .format("RECV370" if args.recv370 else "TSO RECEIVE"))
+    (emit_guarded_text if args.upgrade else emit_text)(
+        recv.format(cmdlib=args.cmdlib, vol=args.volume))
+    (emit_guarded_text if args.upgrade else emit_text)(
+        TOOLS_INSTALL.format(cmdlib=args.cmdlib))
 
 
 
@@ -934,6 +1004,8 @@ for jcl in install:
         # entirely. (They were originally trailing jobs, which also raced
         # RACIND -- separate jobs on separate initiators, same root cause.)
         emit_shadow_load(shadow_bytes)
+        if args.xmit and not args.no_tools:
+            emit_tools()
         emit_help()
     elif 'VTOCSRAC' in jcl:
         emit_vtocsrac(path, guard_apply=args.upgrade)
