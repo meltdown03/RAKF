@@ -37,7 +37,6 @@ their special started tasks.
                                                                                 
       The ESG Security "one point of handling" design, allows for more          
 complete control of the total data center environment.                          
-
                                                                                 
 INSTALLATION.                                                                   
                                                                                 
