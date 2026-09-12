@@ -115,40 +115,34 @@ python script. The most common arguments are:
   (its plaintext passwords are hashed into the shadow file at generation time —
   see *Password Hashing and the Shadow File*)
 - `--profiles` use a custom profiles file instead of the default `profiles.txt`
-- `--xmit` path to the admin-tool XMIT (default: newest `APPLICATIONS/dist/*.xmit`)
+- `--xmit` path to an externally supplied admin-tool XMIT
 - `--cmdlib` load library for the tools (default `SYS2.CMDLIB`)
-- `--no-tools` generate the RAKF core only, without `ADDUSER`/`ALTUSER`
+- `--no-tools` force a core-only install stream without an external XMIT
 
-The RAKF core (HLASM modules, macros, procs) ships as SMP source that MVS
-assembles and link-edits on-target. The `ADDUSER`/`ALTUSER` command processors,
-however, are C load modules built off-platform with the **cc370** toolchain —
-they cannot be assembled on MVS. They are therefore delivered *inline* as a TSO
-XMIT: `generate_release.py` emits the whole jobstream as **EBCDIC card images**
-and embeds the XMIT's raw bytes after a `DD DATA` card, which the install
-unpacks with `RECEIVE` + `IEBCOPY`.
-
-First build the tools (once, on a host with the cc370 toolchain installed):
-
-```
-cd APPLICATIONS && PATH=~/.local/bin:$PATH make package   # -> dist/*.xmit
-```
-
-Then generate the install file:
+The RAKF core, including the HLASM `ADDUSER`, `ALTUSER`, and `DELUSER` command
+processors, ships as SMP source that MVS assembles and link-edits on-target.
+Generate the install file:
 
 ```
 python3 generate_release.py -u users.txt -p profiles.txt -o install_rakf.jcl
 ```
 
-Because the file now contains raw binary, submit it through the **EBCDIC
-pass-through reader** (device `001A`, port `3506`) — **not** the ASCII reader
-`3505`, which would corrupt the binary:
+To embed an externally built FB80 admin-tool XMIT, pass its path explicitly:
+
+```
+python3 generate_release.py -u users.txt -p profiles.txt \
+  --xmit path/to/tools.xmit -o install_rakf.jcl
+```
+
+The generated stream is EBCDIC card images. Submit it through the **EBCDIC
+pass-through reader** (device `001A`, port `3506`):
 
 ```
 cat install_rakf.jcl | ncat --send-only -w1 127.0.0.1 3506
 ```
 
-If you build the RAKF core only (`--no-tools`), the output is plain text again
-and may be submitted to the `3505` reader as before.
+GitHub releases include `rakf-tools.xmit` only when an optional
+`APPLICATIONS/Makefile` build produces an XMIT.
 
 To install RAKF only, without usermods, auxiliary tools, users or profiles you can use
 the file `TEMPLATES/makerakf.sh` which generates the JCL to assemble and link RAKF.
@@ -948,8 +942,8 @@ changed.
 ## Appendix A - Generating your own release
 
 Run the script `generate_release.py` (see *Installation* above for the full
-procedure, including building the `ADDUSER`/`ALTUSER` tools with `make package`
-and submitting the binary stream to the EBCDIC reader on port `3506`).
+procedure, including optional external XMIT embedding and submitting the stream
+to the EBCDIC reader on port `3506`).
 
 ## Appendix B - Add users to UADS
 
@@ -1215,5 +1209,4 @@ RACON     TSTCAT.CLUSTER.DATA
 /*
 //
 ```
-
 
