@@ -113,8 +113,6 @@ python script. The most common arguments are:
   (its plaintext passwords are hashed into the shadow file at generation time  
   see *Password Hashing and the Shadow File*)
 - --profiles use a custom profiles file instead of the default profiles.txt
-- --xmit path to the admin-tool XMIT (default: newest APPLICATIONS/dist/*.xmit)
-- --cmdlib load library for the tools (default SYS2.CMDLIB)
 - --no-tools generate the RAKF core only, without ADDUSER/ALTUSER
 
 The RAKF core (HLASM modules, macros, procs) ships as SMP source that MVS
