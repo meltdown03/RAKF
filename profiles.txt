@@ -4,8 +4,7 @@ DASDVOL *                                           STCGROUPALTER
 DATASET *                                                   READ
 DATASET *                                           ADMIN   ALTER
 DATASET *                                           STCGROUPALTER
-DATASET PUB001.NJE38.NETSPOOL                               UPDATE 
-DATASET RPF.V1R5M3.SRPFPROF                                 UPDATE
+DATASET NJE38.NETSPOOL                                      UPDATE 
 DATASET SYS1.BRODCAST                                       UPDATE
 DATASET SYS1.DUPLEX                                         NONE
 DATASET SYS1.PAGECSA                                        NONE
@@ -17,9 +16,10 @@ DATASET SYS1.SECURE.*                                       NONE
 DATASET SYS1.SECURE.*                               ADMIN   NONE
 DATASET SYS1.SECURE.*                               RAKFADM ALTER
 DATASET SYS1.STGINDEX                                       NONE
-DATASET SYS1.VSAM.MASTER.CATALOG                            UPDATE
-DATASET UCPUB000                                            UPDATE
-DATASET UCPUB001                                            UPDATE
+DATASET SYS1.MCAT.TK5                                       UPDATE
+DATASET SYS1.UCAT.ICOM                                      UPDATE
+DATASET SYS1.UCAT.TK5                                       UPDATE
+DATASET SYS1.UCAT.TSO                                       UPDATE
 FACILITYBRXALLAUTH                                          NONE
 FACILITYBRXCONSAUTH                                         NONE
 FACILITYBRXCONSAUTH                                 ADMIN   READ

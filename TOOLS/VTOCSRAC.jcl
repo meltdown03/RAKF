@@ -1,7 +1,7 @@
 //VTOCSRAC JOB (RACIND),
 //             'SET RACF INDICATOR',
 //             CLASS=A,REGION=4M,
-//             MSGCLASS=A,USER=IBMUSER,PASSWORD=SYS1,
+//             MSGCLASS=A,USER=IBMUSER,PASSWORD=IBMPASS,
 //             MSGLEVEL=(0,0)
 //********************************************************************
 //*
@@ -106,9 +106,9 @@ SAY ''
 //            SPACE=(TRK,(5,5))
 //* **********************************************************
 //* CHANGE RACF BELOW TO NORACF TO REMOVE RACF INDICATOR
-//EXEC     EXEC PGM=BREXX,PARM='RXRUN RACF',REGION=8192K
+//EXEC     EXEC PGM=BREXX,PARM='RXRUN NORACF',REGION=8192K
 //RXRUN    DD   DSN=&&RACIND,DISP=SHR
-//RXLIB    DD   DSN=BREXX.CURRENT.RXLIB,DISP=SHR
+//RXLIB    DD   DSN=BREXX.V2R5M3.RXLIB,DISP=SHR
 //STDIN    DD   DUMMY
 //INDD     DD   DSN=&&LISTCC,DISP=SHR
 //OUTDD    DD   DSN=&&CDSCB,DISP=(,PASS),UNIT=VIO,SPACE=(TRK,(5,5)),
