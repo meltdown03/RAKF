@@ -339,7 +339,6 @@ def emit_header(filename):
             for dsn in upgrade_lib_dsns:
                 emit('  DELETE {} PURGE'.format(dsn))
             emit('  SET MAXCC=0')
-            emit('  SET LASTCC=0')
             emit('/*')
             check_step('//CLNV2LIB EXEC PGM=IDCAMS', filename)
             cleanup_emitted = True
@@ -766,11 +765,11 @@ install = []
 # old TRKF126 installation already has them.  Do not RECEIVE/APPLY them again
 # during an upgrade; among other things, ZPY0001's PRE(ZJW0003) is already
 # satisfied by the existing ZJW0003.
-#if not args.upgrade:
-#    install.extend([
-#        'USERMODS/RAK0001.jcl',
-#        'USERMODS/ZJW0003.jcl',
-#    ])
+if not args.upgrade:
+    install.extend([
+        'USERMODS/RAK0001.jcl',
+        'USERMODS/ZJW0003.jcl',
+    ])
 
 install.extend([
     # ZPY0001 MACUPDs SGIEE0MS to add the //RAKFSHAD DD to MSTJCL00, which is
@@ -804,7 +803,6 @@ for jcl in install:
 //SYSIN    DD *
   DELETE SYS1.SECURE.SHADOW PURGE
   SET MAXCC=0
-  SET LASTCC=0
 /*""")
         emit_rakfcust(path, [blanked_users, _profiles])
         # The shadow load and the HELP install belong HERE -- after
