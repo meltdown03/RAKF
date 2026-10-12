@@ -1,6 +1,6 @@
 //RAKFINST JOB (RAKF),
 //             'RAKF Installation',
-//             CLASS=A,
+//             CLASS=A,USER=HERC01,PASSWORD=CUL8TR,
 //             MSGCLASS=A,
 //             REGION=8192K,
 //             MSGLEVEL=(1,1)
