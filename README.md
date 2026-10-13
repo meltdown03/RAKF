@@ -137,6 +137,13 @@ the file `TEMPLATES/makerakf.sh` which generates the JCL to assemble and link RA
 
 ## Customization
 
+### Adding modules LISTUSER, LU and LISTP into IKJEFTE2
+
+The TSO commands LISTUSER with alias LU and LISTP need APF authorization.
+Therefore module IKJEFTE2 (the authorized command table) needs to be update to add these entries. This can be arranged by applying usermod ZUM0001. 
+
+### Members USERS and PROFILES
+
 The RAKF security configuration is defined by the RAKF users table and the RAKF
 profiles table, which are text files maintained by the security administrator
 to define the system’s users, groups, resources and their protection. These
@@ -1124,7 +1131,7 @@ This usermod installs an updated SVC244 that uses RAKF for authorization.
   *        requested and the JSCBAUTH change is made only if the
   *        security system grants this access
   */.
-++MOD(IGC0024D) DISTLIB(LPALIBA).
+++MOD(IGC0024D) DISTLIB(ALPALIB).
 /*
 //SYSUT2   DD  DSN=&&SMPMCS,DISP=(NEW,PASS),UNIT=SYSALLDA,
 //             SPACE=(CYL,3),
