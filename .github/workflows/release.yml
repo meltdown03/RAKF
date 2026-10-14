@@ -43,7 +43,7 @@ jobs:
           pat = re.compile(r"V\d+R\d+M\d+")
           hit = False
           for i, ln in enumerate(lines):
-              if "RAKF V" in ln and "MVS-sysgen" in ln:
+              if "RAKF V" in ln and "meltdown03" in ln:
                   main, seq = ln[:72], ln[72:]          # cols 1-72 | 73-80
                   main = pat.sub(rv, main, count=1)
                   lines[i] = main.rstrip().ljust(72)[:72] + seq   # keep 80-col layout
