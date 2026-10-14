@@ -45,9 +45,10 @@ arg_parser.add_argument('--upgrade-from', default=None, metavar='FMID',
                              "Implies --upgrade (default: {} when --upgrade is given)."
                              .format(RAKF_FUNCTION, DEFAULT_UPGRADE_FROM))
 arg_parser.add_argument('--userid', default=None,
-                        help="Put USER= on the RAKFINST job card (1 to 7 characters)")
+                        help="Put USER= on the RAKFINST and shadow-recovery job cards "
+                             "(1 to 7 characters)")
 arg_parser.add_argument('--password', default=None,
-                        help="Put PASSWORD= on the RAKFINST job card (1 to 8 characters)")
+                        help="Put PASSWORD= on those job cards (1 to 8 characters)")
 args = arg_parser.parse_args()
 if bool(args.userid) != bool(args.password):
     sys.exit('generate_release.py: --userid and --password must be given together')
@@ -729,7 +730,11 @@ def emit_shadow_recovery(shadow):
     """
     dsn = args.shadow_dsn.upper()
     emit("//RAKFSHAD JOB (RAKF),'RAKF SHADOW RECOVERY',CLASS=A,MSGCLASS=A,")
-    emit("//         MSGLEVEL=(1,1),REGION=4096K,USER=IBMUSER,PASSWORD=IBMPASS")
+    jobtail = "//         MSGLEVEL=(1,1),REGION=4096K"
+    if args.userid:
+        jobtail += ",USER={},PASSWORD={}".format(
+            args.userid.upper(), args.password.upper())
+    emit(jobtail)
     emit("//* Recreate the RAKF V2 password shadow file")
     emit("//DELETE   EXEC PGM=IDCAMS")
     emit("//SYSPRINT DD SYSOUT=*")
