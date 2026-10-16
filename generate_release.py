@@ -35,11 +35,7 @@ arg_parser.add_argument('--run-rakfuser', action='store_true',
                         help="After shadow recovery, EXEC the installed RAKFUSER procedure "
                              "to reload the in-core user table (otherwise IPL/reload later)")
 arg_parser.add_argument('--upgrade', action='store_true',
-                        help="Generate an in-place RAKF upgrade job instead of a fresh install. "
-                             "Implied by --upgrade-from.")
-arg_parser.add_argument('--upgrade-from', default=None, metavar='FMID',
-                        help="Previous RAKF function FMID. Implies --upgrade. "
-                             "++VER is left as written in TEMPLATES/01_header.template.")
+                        help="Generate an in-place RAKF upgrade job instead of a fresh install.")
 arg_parser.add_argument('--userid', default=None,
                         help="Put USER= on the RAKFINST and shadow-recovery job cards "
                              "(1 to 7 characters)")
@@ -52,8 +48,6 @@ if args.userid and len(args.userid) > 7:
     sys.exit('generate_release.py: --userid is longer than 7 characters')
 if args.password and len(args.password) > 8:
     sys.exit('generate_release.py: --password is longer than 8 characters')
-if args.upgrade_from:
-    args.upgrade = True
 
 running_folder = os.path.dirname(os.path.abspath(__file__))
 
