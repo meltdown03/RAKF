@@ -59,7 +59,7 @@ jobs:
       - name: Build RAKF install stream
         run: |
           python3 generate_release.py -u users.txt -p profiles.txt -o install_rakf.jcl
-          python3 generate_release.py --upgrade-from --userid HMVS01 --password CUL8TR -u users.txt -p profiles.txt -o update_rakf.jcl
+          python3 generate_release.py --upgrade --userid HMVS01 --password CUL8TR -u users.txt -p profiles.txt -o update_rakf.jcl
           test -s install_rakf.jcl
           test -s update_rakf.jcl
           echo "install_rakf.jcl: $(stat -c%s install_rakf.jcl) bytes"
