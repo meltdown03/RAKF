@@ -1,4 +1,4 @@
-//JLM0003  JOB SYS,'JLM0003',CLASS=A,REGION=4096K,              
+//ZUM0001  JOB SYS,'ZUM0001',CLASS=A,REGION=4096K,              
 //             MSGLEVEL=(1,1),MSGCLASS=X                                        
 //*                                                                                                                        
 //* Last update: 2026/10/17 17:19                                               
@@ -8,14 +8,14 @@
 //*       This job is based on a TK4 or TK5 system but                          
 //*       can also be user for an RYO system.                                   
 //*                                                                             
-//* Note: Skip the RESTORE step if JLM0003 is not applied.                      
+//* Note: Skip the RESTORE step if ZUM0001 is not applied.                      
 //*                                                                             
 //*                                                                             
 //RESTORE EXEC SMPACC                                                           
 //SMPCNTL  DD  *                                                                
- RESTORE S(NJE0001,JLM0003) DIS(WRITE).
+ RESTORE S(NJE0001,ZUM0001) DIS(WRITE).
  RESETRC.
- RESTORE S(JLM0003) DIS(WRITE).
+ RESTORE S(ZUM0001) DIS(WRITE).
  RESETRC.
 /*                                                                              
 //*                                                                             
@@ -162,17 +162,17 @@ APFCTABL DS    0D                      ALIGNMENT
 /*                                                                              
 //SYSUT1   DD  DSN=&&OBJ,DISP=(OLD,DELETE)                                      
 //         DD  *                                                                
-    IDENTIFY IKJEFTE2('JLM0003')                                                
+    IDENTIFY IKJEFTE2('ZUM0001')                                                
 /*                                                                              
 //SYSUT2   DD  DSN=&&OBJ2(IKJEFTE2),UNIT=SYSALLDA,                              
 //             DCB=(DSORG=PS,RECFM=FB,LRECL=80,BLKSIZE=3200),                   
 //             SPACE=(TRK,(1,1,1)),DISP=(,PASS)                                 
 //*                                                                             
-//*        RECEIVE JLM0003                                                      
+//*        RECEIVE ZUM0001                                                      
 //*                                                                             
 //RECEIVE EXEC SMPREC                                                           
 //SMPPTFIN DD  *                                                                
-++ USERMOD(JLM0003) REWORK(20261008)      .                                     
+++ USERMOD(ZUM0001) REWORK(20261008)      .                                     
 ++ VER(Z038)                                                                    
    FMID(EBB1102)                                                                
    .                                                                            
@@ -183,15 +183,15 @@ APFCTABL DS    0D                      ALIGNMENT
 /*                                                                              
 //IKJEFTE2 DD  DSN=&&OBJ2(IKJEFTE2),DISP=(OLD,PASS)                             
 //SMPCNTL  DD  *                                                                
-  REJECT SELECT(JLM0003).
+  REJECT SELECT(ZUM0001).
   RESETRC.
-  RECEIVE SELECT(JLM0003).                                                      
+  RECEIVE SELECT(ZUM0001).                                                      
 /*                                                                              
-//*       APPLY JLM0003                                                         
+//*       APPLY ZUM0001                                                         
 //*                                                                             
 //APPLY   EXEC SMPACC                                                           
 //IKJEFTE2 DD  DSN=&&OBJ2(IKJEFTE2),DISP=(OLD,DELETE)                           
 //SMPCNTL  DD  *                                                                
-  APPLY SELECT(JLM0003) DIS(WRITE).                                             
+  APPLY SELECT(ZUM0001) DIS(WRITE).                                             
 /*                                                                              
 //                                                                              
