@@ -140,7 +140,9 @@ the file `TEMPLATES/makerakf.sh` which generates the JCL to assemble and link RA
 ### Adding modules LISTUSER, LU and LISTP into IKJEFTE2
 
 The TSO commands LISTUSER with alias LU and LISTP need APF authorization.
-Therefore module IKJEFTE2 (the authorized command table) needs to be update to add these entries. This can be arranged by applying usermod ZUM0001. 
+Therefore, module IKJEFTE2 (the authorized command table) needs to be updated to add these entries. This can be arranged by adding LISTUSER, LU and LISTP in module IKJEFTE2. 
+In MVSCE, the usermod JLM0003 is available and in the MVS Turnkey 4 and Turnkey 5, the usermod ZUM0001 contains IKJEFTE2.
+Update the source of IKJEFTE2 and re-apply the usermod. After apply of JLM0003 or ZUM0001, IPL the system with CLPA.
 
 ### Members USERS and PROFILES
 
@@ -1015,14 +1017,16 @@ changed.
 
 - Salted **SHA-256** password hashing. `RAKFHASH` is pure S/370 HLASM,
   validated against the NIST FIPS 180-4 vectors; `RAKFPWH` wraps it as
-  `SHA256(salt || password)`. The sign-on path (`ICHSFR00`) and the
+  `SHA256(salt || password)`. The SAF router (`ICHSFR00`) and the
   administration tools call the same routine, so a stored digest and a login
   attempt are compared byte for byte.
 - New shadow file `SYS1.SECURE.SHADOW`, one 48-byte record per user holding
   the userid, an 8-byte salt and the digest. Protected by the existing
   `SYS1.SECURE.*` profile at `UACC(NONE)`.
 - `RAKFUSER` loads the shadow into the in-core table at IPL through the new
-  `RAKFSHAD` DD, added to `MSTJCL00` by usermod `ZPY0001`.
+  `RAKFSHAD` DD, added to `MSTJCL00` by the reworked usermod `ZJW0003`.
+- Define the Class Descriptor table in RACSTAT and test all classes against
+  this table.
 - New `ADDUSER`, `ALTUSER', 'DELUSER', 'LISTUSER', 'ADDSD', 'RDEFINE', PERMIT
   and 'RDELETE' command processors, installed into
   `SYS1.CMDLIB`, with TSO HELP members in `SYS2.HELP`. They locate the
@@ -1035,6 +1039,10 @@ changed.
   `generate_release.py` blanks the password column and emits the shadow
   records into the install stream, so no clear-text password reaches the
   system and there is no chicken-and-egg with the tools above.
+- Rename RAKFUSER to its original name CJYRUIDS with alias RAKFUSER.
+- Rename RAKFPROF to its original name CJYRPROF with alias RAKFPROF and check the class names against the CDT.
+- Rename RAKFPWUP to CJYPWUP and call CJYRUIDS to process the changed passwords immediately.
+- Bring the SAMPLIB members back into the system.
 
 ## Appendix A - Generating your own release
 
