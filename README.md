@@ -160,10 +160,11 @@ sysgen.
 
 During the process of adapting the profiles and users tables to meet your
 security requirements special attention to the protection of the
-`SYS1.SECURE.CNTL` and `SYS1.SECURE.PWUP` should be paid:
+`SYS1.SECURE.CNTL`, `SYS1.SECURE.PWUP` and 'SYS1.SECURE.SHADOW' should be paid:
 - `SYS1.SECURE.CNTL`: started tasks and the user(s) and/or group(s) responsible
   for RAKF administration need UPDATE access to this dataset.
 - `SYS1.SECURE.PWUP`: started tasks need UPDATE access to this dataset.
+- `SYS1.SECURE.SHADOW`: started tasks need UPDATE access to this dataset.
 
 Passwords are **no longer stored in these datasets**. As of the salted
 SHA-256 password hashing (see *Password Hashing and the Shadow File* below),
@@ -177,7 +178,7 @@ profile also covers `SYS1.SECURE.SHADOW`, which should always be `UACC(NONE)`.
 If the standard setup is used started tasks have OPERATIONS and the NOSPECIAL
 authority and thus don't need to be explicitly allowed.
 
-## Users and Profiles Tables
+## Users and Profiles Tables and SHADOW data set.
 
 
 In order for the profiles tables to be valid, it must be in
@@ -221,11 +222,14 @@ stopped upon the first hit.
 Below is an example `USERS` table:
 
 ```
-HMVS01   ADMIN   *CUL8TR   Y Y
-HMVS01   RAKFADM  CUL8TR   Y Y
-HMVS02   USER     PASS4U   N N
-IBMUSER  ADMIN   *SYS1     Y Y
-IBMUSER  RAKFADM *SYS1     Y Y
+----x----1----x----2----x----3     
+HMVS01   ADMIN   *         Y Y
+HMVS01   RAKFADM           Y Y
+HERC01   ADMIN   *         Y Y
+HERC01   RAKFADM           Y Y
+HMVS02   USER              N N
+IBMUSER  ADMIN   *         Y Y
+IBMUSER  RAKFADM *         Y Y
 ```
 
 This controls user access. Each line is a user, group, password,
@@ -236,7 +240,7 @@ operations and special as described below:
 |  1 -  8 | USERID                                                    |
 | 10 - 17 | User Group (Installation defined)                         |
 | 18      | Asterisk '*' multiple user groups exist for this userid.  |
-| 19 - 26 | Password (legacy)                                         |
+| 19 - 26 | Password (not used, moved to SYS1.SECURE.SHADOW)          |
 | 28      | Operations Authority (Y or N). Always allow access¹       |
 | 30      | Special Authority (Y, N, or blank). RAKF admin authorities|
 | 31 - 50 | Comment field (used by "IBM RACF").                       |
@@ -325,11 +329,20 @@ LISTUSER lists the UserId in the Users core table.
 ```
 ADDUSER userid PASSWORD(pw) DFLTGRP(group) [GROUP(g2 g3 ...)] [OPERATIONS] [SPECIAL]
 An alias of ADDUSER is AU.
+
 ALTUSER userid [PASSWORD(pw)] [DFLTGRP(group)] [OPERATIONS|NOOPERATIONS] [SPECIAL|NOSPECIAL]
 An alias of ALTUSER is ALU.
-DELUSER userid GROUP(group) /* GROUP is optional */ 
+
+DELUSER userid GROUP(group) /* GROUP is optional */
+If GROUP is omitted, all user records are deleted.
+
 CONNECT userid GROUP(group)
+
 LISTUSER userid
+'userid' is a (part) of a userid.
+Example:
+LISTUSER HERC lists all users starting with 'HERC'
+
 An alias of LISTUSER is LU
 Example output:
 listuser herc01
@@ -351,7 +364,7 @@ PASSWORD may be coded as PWD, GROUP as GRP and DFLTGRP as DGRP.
 - **DELUSER** removes a user from SYS1.SECURE.SHADOW and SYS1.SECURE.CNTL(USERS).
   if GROUP is omitted. If GROUP is specified only the GROUP will be deleted (disconnect).
 - **CONNECT** connects a UserId to a GROUP.
-- **LISTUSER** list a UserId from the RAKF in core users table.
+- **LISTUSER** list one or more UserIds from the RAKF in core users table.
 
 **Note:** To use these TSO commands, the SPECIAL authority is required.
 
