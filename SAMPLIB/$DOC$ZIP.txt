@@ -11,7 +11,7 @@ User's Guide
 > as a result adding new users requires using the TSO command ADDUSER
 > and changing requires ALTUSER. Read the HELP/ files for more details
 
-August 2026
+October 2026
 
     **********************************************************************
     *                                                                    *
@@ -65,7 +65,6 @@ special started tasks, this can be done in one of two ways:
    or in the hercules console /S RAKFPROF and /S RAKFUSER
 2. From JCL:
 
-[jcl]
     //RAKFUPDT JOB (RAKF),'UPDATE RAKF',CLASS=A,MSGCLASS=A
     //RAKFUSER EXEC RAKFUSER
     //RAKFPROF EXEC RAKFPROF
@@ -226,7 +225,7 @@ Users Table
 
 Below is an example USERS table:
 
-   ----x----1----x----2----x----3     
+   ----.----1----.----2----.----3     
    HMVS01   ADMIN   *         Y Y
    HMVS01   RAKFADM           Y Y
    HERC01   ADMIN   *         Y Y
@@ -347,7 +346,7 @@ LISTUSER lists the UserId in the Users core table.
     Example output:
     listuser herc01
     LISTUSER: UserID=HERC01
-              Authority=  OPERATONS,  SPECIAL
+              Authority=  OPERATIONS,  SPECIAL
               Connected GROUPS:
               ADMIN    (DFLTGRP)
               RAKFADM                         
@@ -643,7 +642,7 @@ More information of these commands can be found by issuing HELP command name.
 
     RDELETE profile CLASS(class) ID(group)
     Required: 'profile', CLASS, ID.
-    If ID(ALL) is specified, all records of 'profile' are deleted
+    If ID is omitted, all records of 'profile' are deleted
     including the Universal Access record.
 
     LISTP profile or the beginning part of the profile    
@@ -658,6 +657,30 @@ More information of these commands can be found by issuing HELP command name.
            Access list:                                               
            ADMIN    ALTER                                             
            RAKFADM  ALTER    
+
+## Defined classes in RAKF
+
+All classes in the PROFILES table need to be defined in RAKF.
+The classes are in the Class Descriptor Table (CDT).
+The following classes are defined:
+
+CLASS    | Maximum entity length  
+---------+------------------------
+ACCTNUM  | 8                      
+APPL     | 8                      
+DASDVOL  | 6                      
+DATASET  | 44                     
+FACILITY | 39                     
+JESSPOOL | 8                      
+PERFGRP  | 8                      
+PROGRAM  | 8                      
+PROPCNTL | 8                      
+TAPEVOL  | 6                      
+TERMINAL | 8                      
+TSOAUTH  | 8                      
+TSOPROC  | 8                      
+
+An entity with a class not in the above table will be rejected.
 
 Batch Jobs and Started Task Considerations
 ------------------------------------------
@@ -865,7 +888,6 @@ To set or clear the RACF indicator of any catalog entry (the catalog cluster
 itself, any VSAM objects and their components) the RACIND utility is used. It
 is called as follows:
 
-[jcl]
     //RACIND  EXEC PGM=RACIND
     //SYSPRINT DD  SYSOUT=*
     //SYSIN    DD  *
@@ -1100,7 +1122,6 @@ Appendix B - Add users to UADS
 
 This job is for use with MVSCE and Jay Moseley sysgen
 
-[jcl]
     //NEWUSER  JOB (TSO),'New User',CLASS=S,MSGCLASS=A,
     //         REGION=8192K,MSGLEVEL=(1,1),
     //* Replace NEWUSER with the user you wish to use
@@ -1114,7 +1135,6 @@ Appendix C - SORT job
 
 Below is an MVTSORT job which will sort the USERS and PROFILES members
 
-[jcl]
     //RAKFUPST JOB (TSO),
     //             'UP',
     //             CLASS=S,
@@ -1171,7 +1191,6 @@ Appendix D - USERMOD RAK0001
 
 This usermod installs an updated SVC244 that uses RAKF for authorization.
 
-[jcl]
     //RAK00011 EXEC PGM=IEBGENER
     //SYSPRINT DD  SYSOUT=*
     //SYSUT1   DD  *
@@ -1309,7 +1328,6 @@ This usermod installs an updated SVC244 that uses RAKF for authorization.
 Appendix E - RACIND Example
 ---------------------------
 
-[jcl]
     //RACIND   JOB
     //********************************************************************
     //*
