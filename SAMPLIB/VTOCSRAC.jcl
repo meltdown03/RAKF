@@ -18,7 +18,7 @@
 //*       LIKE START1 AND SPOOL0 IN TK3 SYSTEMS), THESE SHOULD BE               
 //*       VARIED OFFLINE BEFORE SUBMITTING THIS JOB.                            
 //*                                                                             
-//*       CHANGE BREXX.CURRENT.RXLIB IN THE CURRENT BREXX RXLIB                 
+//*       CHANGE BREXX.RXLIB IN THE BREXX RXLIB                 
 //*                                                                             
 //* REQUIREMENTS: BREXX V2R5M2 OR GREATER MUST BE INSTALLED                     
 //*                                                                             
@@ -106,7 +106,7 @@ SAY ''
 //* CHANGE RACF BELOW TO NORACF TO REMOVE RACF INDICATOR                        
 //EXEC     EXEC PGM=BREXX,PARM='RXRUN RACF',REGION=8192K                        
 //RXRUN    DD   DSN=&&RACIND,DISP=SHR                                           
-//RXLIB    DD   DSN=BREXX.CURRENT.RXLIB,DISP=SHR                                
+//RXLIB    DD   DSN=BREXX.RXLIB,DISP=SHR                                
 //STDIN    DD   DUMMY                                                           
 //INDD     DD   DSN=&&LISTCC,DISP=SHR                                           
 //OUTDD    DD   DSN=&&CDSCB,DISP=(,PASS),UNIT=VIO,SPACE=(TRK,(5,5)),            
