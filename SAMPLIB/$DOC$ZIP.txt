@@ -1041,7 +1041,7 @@ The following PTFs are available:
 - RRKF002: Enhance RACINIT NEWPASS functionality to support permanent
   password changes to be initiated by an application. This enables standard
   password change functionality as for example entering currentpw/newpw on the
-  'ENTER PASSWORD for uuuuuuu' at TSO logon time.
+  'ENTER CURRENT PASSWORD for uuuuuuu' at TSO logon time.
 - RRKF003: Security enhancement in users and profiles tables processing.
 - RRKF004: Consolidation of documentation members from RAKF's SAMPLIB to the
   RAKF User's Guide.
