@@ -9,7 +9,7 @@
 //*                                                                             
 //* DESC: LIST RACF INDICATOR STATUS OF ALL VSAM OBJECTS                        
 //*                                                                             
-//*       CHANGE BREXX.CURRENT.RXLIB IN THE CURRENT BREXX RXLIB                 
+//*       CHANGE BREXX.RXLIB IN YOUR RXLIB IF NECESSARY                 
 //*                                                                             
 //********************************************************************          
 //LISTUCAT EXEC PGM=IDCAMS                                                      
@@ -139,7 +139,7 @@ SAY ''
 //* CHANGE RACF BELOW TO NORACF TO REMOVE RACF INDICATOR                        
 //EXECCAT  EXEC PGM=BREXX,PARM='RXRUN',REGION=8192K                             
 //RXRUN    DD   DSN=&&RXCAT,DISP=SHR                                            
-//RXLIB    DD   DSN=BREXX.CURRENT.RXLIB,DISP=SHR                                
+//RXLIB    DD   DSN=BREXX.RXLIB,DISP=SHR                                
 //STDIN    DD   DUMMY                                                           
 //INDD     DD   DSN=&&UCAT,DISP=SHR                                             
 //OUTDD    DD   DSN=&&CATS,DISP=(,PASS),UNIT=VIO,SPACE=(TRK,(5,5)),             
@@ -155,7 +155,7 @@ SAY ''
 //* CHANGE ON BELOW TO OFF TO REMOVE RACF INDICATOR                             
 //EXECCAT2 EXEC PGM=BREXX,PARM='RXRUN ON',REGION=8192K                          
 //RXRUN    DD   DSN=&&RXPRSE,DISP=SHR                                           
-//RXLIB    DD   DSN=BREXX.CURRENT.RXLIB,DISP=SHR                                
+//RXLIB    DD   DSN=BREXX.RXLIB,DISP=SHR                                
 //STDIN    DD   DUMMY                                                           
 //INDD     DD   DSN=&&LIST,DISP=SHR                                             
 //OUTDD    DD   DSN=&&RACIND,DISP=(,PASS),UNIT=VIO,SPACE=(TRK,(5,5)),           
