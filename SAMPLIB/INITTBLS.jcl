@@ -6,7 +6,10 @@
 //* ------------------------------------------------------------------*         
 //* Allocate PDS SYS1.SECURE.CNTL and populate it                     *         
 //* with initial users and groups tables                              *         
-//* Change 'TK5CAT' in your volume requested.                         *         
+//* Change 'TK5CAT' in your volume requested.                         *
+//*                                                                   *
+//* This job will be generated in install_rakf.jcl and is resident    *
+//* in TRKF210.zip in the TK5 directory.                              *
 //*                                                                   *         
 //* Expected return code:  Step TABLES: 00                            *         
 //* ------------------------------------------------------------------*         
