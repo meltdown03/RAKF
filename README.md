@@ -15,7 +15,7 @@ A Security System for MVS 3.8j
 > PERMIT (to grant access to a profile), RDELETE (to delete an access
 > rule or an entire profile) and LISTP to list profiles.
 
-October 2026
+November 2026
 
 ```
 **********************************************************************
