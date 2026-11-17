@@ -842,7 +842,7 @@ until a valid CATALOG statement has been executed. See Appendix E demonstrating
 the use of the RACIND utility.
 
 
-### Setting RACF Indicator for all el
+## Setting RACF Indicator for all eligible data sets
 
 ### Setting or Clearing the RACF Indicator of All Eligible Non-VSAM Datasets
 
