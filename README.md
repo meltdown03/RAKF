@@ -1,13 +1,14 @@
-# RAKF Version 2 Release 0 Modification 0
+# RAKF Version 2 Release 1 Modification 0
 
 A Security System for MVS 3.8j
 
 ## User’s Guide
 
 > [!IMPORTANT]
-> New for version 2.0.0 users are hashed and stores in a shadow file. 
-> as a result adding new users requires using the TSO command ADDUSER
-> and changing requires ALTUSER. Read the HELP/ files for more defails 
+> New for version 2.1.0 users are hashed and stores in the USERS member. 
+> as a result adding new users requires using the TSO command ADDUSER,
+> changing requires ALTUSER, deleting requires DELUSER and listing
+> requires LISTUSER. Read the HELP/ files for more details 
 
 October 2026
 
@@ -24,7 +25,7 @@ October 2026
 *    adapted to MVS 3.8J: A. Philip Dickinson (Aug 2005)             *
 *                         Phil Roberts        (Apr 2011)             *
 *                         Jürgen Winkelmann   (Apr 2011)             *
-*                         Rob Prins           (Sep 2026)             *
+*                         Rob Prins           (Nov 2026)             *
 *                                                                    *
 **********************************************************************
 *                                                                    *
@@ -166,19 +167,19 @@ security requirements special attention to the protection of the
 - `SYS1.SECURE.PWUP`: started tasks need UPDATE access to this dataset.
 - `SYS1.SECURE.SHADOW`: started tasks need UPDATE access to this dataset.
 
-Passwords are **no longer stored in these datasets**. As of the salted
+Passwords are **stored in the first record of the RAKF user in the USERS member**
+As of the salted
 SHA-256 password hashing (see *Password Hashing and the Shadow File* below),
-each credential lives as a salted digest in a separate shadow file,
-`SYS1.SECURE.SHADOW`; the `USERS` password column is left blank. The control
+each credential lives as a salted digest in the USERS member;
+the `USERS` password column is left blank. The control
 datasets still govern who may sign on and what they may do, so users must not
 be allowed access to them. An easy way to protect them is to define a dataset
 profile `SYS1.SECURE.*` with universal access NONE and selectively allow the
-RAKF administrator user(s)/group(s) `UPDATE` access to this profile. That
-profile also covers `SYS1.SECURE.SHADOW`, which should always be `UACC(NONE)`.
+RAKF administrator user(s)/group(s) `UPDATE` access to this profile.
 If the standard setup is used started tasks have OPERATIONS and the NOSPECIAL
 authority and thus don't need to be explicitly allowed.
 
-## Users and Profiles Tables and SHADOW data set.
+## Users and Profiles Tables.
 
 
 In order for the profiles tables to be valid, it must be in
@@ -222,14 +223,14 @@ stopped upon the first hit.
 Below is an example `USERS` table:
 
 ```
-----.----1----.----2----.----3     
-HMVS01   ADMIN   *         Y Y
-HMVS01   RAKFADM           Y Y
-HERC01   ADMIN   *         Y Y
-HERC01   RAKFADM           Y Y
-HMVS02   USER              N N
-IBMUSER  ADMIN   *         Y Y
-IBMUSER  RAKFADM *         Y Y
+----.----1----.----2----.----3----.----4----.----5----.----6----.----7.     
+HMVS01  11ADMIN  *         Y Y sssssssspppppppppppppppppppppppppppppppp
+HMVS01  2RAKFADM         
+HERC01  1ADMIN   *         Y Y sssssssspppppppppppppppppppppppppppppppp
+HERC01  2RAKFADM
+HMVS02  1USER              N N sssssssspppppppppppppppppppppppppppppppp
+IBMUSER 1ADMIN   *         Y Y sssssssspppppppppppppppppppppppppppppppp
+IBMUSER 2RAKFADM 
 ```
 
 This controls user access. Each line is a user, group, password,
@@ -238,39 +239,36 @@ operations and special as described below:
 | Column  | Description                                               |
 |:-------:|:----------------------------------------------------------|
 |  1 -  8 | USERID                                                    |
+|  9      | Record type (1 or 2)                                      |
 | 10 - 17 | User Group (Installation defined)                         |
 | 18      | Asterisk '*' multiple user groups exist for this userid.  |
 | 19 - 26 | Password (not used, moved to SYS1.SECURE.SHADOW)          |
 | 28      | Operations Authority (Y or N). Always allow access¹       |
+|         | (only if record type = 1)                                 |
 | 30      | Special Authority (Y, N, or blank). RAKF admin authorities|
-| 31 - 50 | Comment field (used by "IBM RACF").                       |
+|         | (only id record type = 1)                                 |
+| 32 - 39 | salt (only id record type = 1)                            |
+| 40 - 71 | sha256 hashed password (only if record type = 1)          |
 
 *1* Unless explicitly denied access via a rule
 
-Each line can be broken down as:
-
-```
-UUUUUUUU GGGGGGGGSPPPPPPPP A  CCCCCCCCCCCCCCCCCCC
-Username Group   *Password O  Comment
-```
-
-Userids in the users table that were set up with multiple group
+UserIds in the users table that were set up with multiple group
 entries will get the highest authority for all protected objects in
 all the groups. As a practical example, multiple groups are used for
 managers who oversee the work of several programming groups.  The
 multiple group arrangement gives these managers access to everything
 done by all the groups under them.
 
-> :information_source: **Passwords are no longer kept in the `USERS` table.**
+> :information_source: **Passwords are kept in the `USERS` table but encryted.**
 > The password column (columns 19–26) is left blank; the actual credential is a
 > salted SHA-256 digest held in the shadow file (see below). The example above
 > shows the historical clear-text layout for reference only.
 
-### Password Hashing and the Shadow File
+### Password Hashing 
 
 Earlier releases stored each password in clear text (obscured only by a
 reversible XOR "scramble"). Passwords are now protected with a **salted
-SHA-256** hash:
+SHA-256** hash in the USERS member.
 
 ```
 digest = SHA-256( salt || password )
@@ -283,17 +281,8 @@ digest = SHA-256( salt || password )
   so enrollment and TSO/JOB-card sign-on agree.
 - **digest** — the raw 32-byte SHA-256 result.
 
-The salt and digest are stored in the shadow file **`SYS1.SECURE.SHADOW`**, a
-sequential `RECFM=FB,LRECL=48` dataset with one 48-byte record per user:
-
-| Bytes   | Field                    |
-|:-------:|:-------------------------|
-|  1 –  8 | USERID                   |
-|  9 – 16 | Salt (8 bytes, binary)   |
-| 17 – 48 | SHA-256 digest (32 bytes)|
-
-Keeping the digests in a *separate* dataset lets you lock it down harder than
-the rest of `SYS1.SECURE.CNTL` — it should be `UACC(NONE)` so that even reading
+Keeping the digests in the USERS member lets you lock it down harder.
+The data set`SYS1.SECURE.CNTL` should be `UACC(NONE)` so that even reading
 it (an offline dictionary attack) is denied to everyone but the RAKF
 administrator.
 
@@ -302,7 +291,7 @@ the NIST FIPS 180-4 test vectors) wrapped by `RAKFPWH`, which builds
 `salt || password` and calls it. Both the sign-on path (`ICHSFR00`) and the
 enrollment tools call the *same* routine, so a stored digest and a login
 attempt are compared byte-for-byte. `RAKFUSER` loads the shadow file into the
-in-core user table via the `RAKFSHAD` DD at IPL, alongside the `USERS` table.
+in-core user table via the `RAKFUSER` DD at IPL.
 
 **Initial users are seeded at install time.** You still write plaintext
 passwords in the `users.txt` file (column 19–26, as shown above), but
@@ -361,7 +350,7 @@ PASSWORD may be coded as PWD, GROUP as GRP and DFLTGRP as DGRP.
   record. `PASSWORD` and `DFLTGRP` are required; it fails if the user exists.
 - **ALTUSER** changes an existing user: `PASSWORD` re-hashes with a fresh salt,
   `DFLTGRP` moves the default-group flag, and the flags toggle operations/special.
-- **DELUSER** removes a user from SYS1.SECURE.SHADOW and SYS1.SECURE.CNTL(USERS).
+- **DELUSER** removes a user from SYS1.SECURE.CNTL(USERS).
   if GROUP is omitted. If GROUP is specified only the GROUP will be deleted (disconnect).
 - **CONNECT** connects a UserId to a GROUP.
 - **LISTUSER** list one or more UserIds from the RAKF in core users table.
@@ -375,7 +364,7 @@ ADDUSER SMITH PASSWORD(START123) DFLTGRP(USER)
 ```
 
 —or in **batch** under the terminal monitor, invoked with `CALL` so the load
-module is found in `SYS2.CMDLIB` (keep the command within column 72, using a
+module is found in `SYS1.CMDLIB` (keep the command within column 72, using a
 TSO continuation `+` if needed):
 
 ```
@@ -1074,6 +1063,19 @@ changed.
 - Rename RAKFPROF to its original name CJYRPROF with alias RAKFPROF and check the class names against the CDT.
 - Rename RAKFPWUP to CJYPWUP and call CJYRUIDS to process the changed passwords immediately.
 - Bring the SAMPLIB members back into the system.
+
+
+### RAKF 2.1.0 (November 2026)
+
+- The SYS1.SECURE.SHADOW has been deleted.
+- The sha256(salt || password) is stored in record type 1 of the RAKF user in record
+  type 1 in the USERS member in SYS1.SECURE.CNTL.
+- The TSO commands ADDUSER, ALTUSER, DELUSER and CONNECT are updated to use the
+  USERS member and to eliminate the SHADOW data set.
+- The modules RAKFPSAV and CJYRUIDS (alias RAKFUSER) are updated to eliminate SYS1.SECURE.SHADOW.
+- The module ICHSEC00 is updated with the new version of RAKF.
+- The HELP members of ADDUSER, ALTUSER and DELUSER are updated.
+- Usermod ZJW0003 is updated to eliminate SYS1.SECURE.SHADOW.
 
 ## Appendix A - Generating your own release
 
