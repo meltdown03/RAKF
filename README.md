@@ -251,8 +251,8 @@ operations and special as described below:
 | 28      | Operations Authority (Y or N). Always allow access¹       |
 |         | (only if record type = 1)                                 |
 | 30      | Special Authority (Y, N, or blank). RAKF admin authorities|
-|         | (only id record type = 1)                                 |
-| 32 - 39 | salt (only id record type = 1)                            |
+|         | (only if record type = 1)                                 |
+| 32 - 39 | salt (only if record type = 1)                            |
 | 40 - 71 | sha256 hashed password (only if record type = 1)          |
 
 *1* Unless explicitly denied access via a rule
@@ -990,8 +990,8 @@ changed.
   `RAKFSHAD` DD, added to `MSTJCL00` by the reworked usermod `ZJW0003`.
 - Define the Class Descriptor table in RACSTAT and test all classes against
   this table.
-- New `ADDUSER`, `ALTUSER', 'DELUSER', 'LISTUSER', 'ADDSD', 'RDEFINE', PERMIT
-  and 'RDELETE' command processors, installed into
+- New `ADDUSER`, `ALTUSER', 'DELUSER', 'LISTUSER', 'ADDSD', 'RDEFINE', 'PERMIT',
+  'RDELETE' and 'LISTP' command processors, installed into
   `SYS1.CMDLIB`, with TSO HELP members in `SYS2.HELP`. They locate the
   control datasets with TSO **IKJDAIR** dynamic allocation, so no DD
   statements are required.
@@ -1011,8 +1011,8 @@ changed.
 ### RAKF 2.1.0 (November 2026)
 
 - The SYS1.SECURE.SHADOW has been deleted.
-- The sha256(salt || password) is stored in record type 1 of the RAKF user in record
-  type 1 in the USERS member in SYS1.SECURE.CNTL.
+- The sha256(salt || password) is stored in record type 1 of the RAKF user
+  in the USERS member in SYS1.SECURE.CNTL.
 - The TSO commands ADDUSER, ALTUSER, DELUSER and CONNECT are updated to use the
   USERS member and to eliminate the SHADOW data set.
 - The modules RAKFPSAV and CJYRUIDS (alias RAKFUSER) are updated to eliminate SYS1.SECURE.SHADOW.
