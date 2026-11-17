@@ -714,25 +714,12 @@ emit_smp_tail(running_folder + "/TEMPLATES/02_smp4.template")
 
 install = []
 
-# These two USERMODs are part of the normal/fresh RAKF installation, but the
-# old TRKF126 installation already has them.  Do not RECEIVE/APPLY them again
-# during an upgrade; among other things, ZPY0001's PRE(ZJW0003) is already
-# satisfied by the existing ZJW0003.
-# Usermod ZUM0001 adds the TSO command processors LISTUSER, LU and LISTP
-# to the TSO authorized command table IKJEFTE2.
+# RAK0001 is already installed on the supported upgrade path.
 if not args.upgrade:
-    install.extend([
-        'USERMODS/RAK0001.jcl',
-        'USERMODS/ZJW0003.jcl',
-    ])
+    install.append('USERMODS/RAK0001.jcl')
 
 install.extend([
-    # ZJW0003 MACUPDs SGIEE0MS to add the //RAKFSHAD DD to MSTJCL00, which is
-    # how RAKFUSER reaches SYS1.SECURE.SHADOW at IPL. 
-    # ZJW0003 already installed with the previous RAKF release.
-    # Without it the OPEN fails with 'IEC130I RAKFSHAD DD STATEMENT MISSING',
-    # no hashes load, and -- since the generator blanks the USERS
-    # password column -- every credential on the system becomes unverifiable.
+    'USERMODS/ZJW0003.jcl',
     'USERMODS/JLM0003.jcl',
     'TOOLS/RAKFCUST.jcl',
     'AUX/VTOC/vtoc.jcl',
