@@ -87,7 +87,7 @@
    SCRATCH VOL=3350=MVSRES,DSNAME=SYS1.LINKLIB,MEMBER=ICHSEC00
 /*
 //* ------------------------------------------------------------------*
-//* SMP receive of RAKF 2.0.0                                         *
+//* SMP receive of RAKF 2.1.0                                         *
 //* Expected return code: 00                                          *
 //* ------------------------------------------------------------------*
 //RECEIVER EXEC SMPREC
