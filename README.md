@@ -5,10 +5,15 @@ A Security System for MVS 3.8j
 ## User’s Guide
 
 > [!IMPORTANT]
-> New for version 2.1.0 users are hashed and stores in the USERS member. 
+> New for version 2.1.0 passwords are hashed and stores in the USERS member. 
 > as a result adding new users requires using the TSO command ADDUSER,
 > changing requires ALTUSER, deleting requires DELUSER and listing
-> requires LISTUSER. Read the HELP/ files for more details 
+> requires LISTUSER. Read the HELP/ files for more details
+>
+> The PROFILES member is controlled by the TSO commands ADDSD
+> (add DATASET profile), RDEFINE (add generalized resource profiles),
+> PERMIT (to grant access to a profile), RDELETE (to delete an access
+> rule or an entire profile) and LISTP to list profiles.
 
 October 2026
 
@@ -389,159 +394,97 @@ Until the reload, the new or changed credential exists only on disk.
 Below is an example `PROFILES` table:
 
 ```
-************************************************
-*                                              *
-* RAKF profile definitions for TK4-            *
-*                                              *
-************************************************
-*
-* rdefine dasdvol * uacc(read)
-* permit * cl(dasdvol) id(admin,stcgroup) access(alter)
-*
-DASDVOL *                                                   READ
-DASDVOL *                                           ADMIN   ALTER
-DASDVOL *                                           STCGROUPALTER
-*
-* addsd  '*.**'                      uacc(read)
-* permit '*.**' id(admin,stcgroup)   access(alter)
-*
-DATASET *                                                   READ
-DATASET *                                           ADMIN   ALTER
-DATASET *                                           STCGROUPALTER
-*
-* addsd  'IPCS.DATA.SET.DIRECTRY'    uacc(update)
-* addsd  'IPCS.PROBLEM.DIRECTRY'     uacc(update)
-*
-DATASET IPCS.DATA.SET.DIRECTRY                              UPDATE
-DATASET IPCS.PROBLEM.DIRECTRY                               UPDATE
-*
-* addsd  'RPF.V1R5M3.SRPFPROF'       uacc(update)
-*
-DATASET RPF.V1R5M3.SRPFPROF                                 UPDATE
-*
-* addsd  'SYS1.BRODCAST'             uacc(update)
-*
-DATASET SYS1.BRODCAST                                       UPDATE
-*
-* addsd  'SYS1.DUPLEX'               uacc(none)
-* addsd  'SYS1.PAGECSA'              uacc(none)
-* addsd  'SYS1.PAGELPA'              uacc(none)
-* addsd  'SYS1.PAGEL01'              uacc(none)
-* addsd  'SYS1.PAGEL02'              uacc(none)
-* addsd  'SYS1.PAGES01'              uacc(none)
-*
-DATASET SYS1.DUPLEX                                         NONE
-DATASET SYS1.PAGECSA                                        NONE
-DATASET SYS1.PAGELPA                                        NONE
-DATASET SYS1.PAGEL01                                        NONE
-DATASET SYS1.PAGEL02                                        NONE
-DATASET SYS1.PAGES01                                        NONE
-*
-* addsd  'SYS1.SECURE.*'             uacc(none)
-* permit 'SYS1.SECURE.*' id(admin)   access(none)
-* permit 'SYS1.SECURE.*' id(rakfadm) access(update)
-*
-DATASET SYS1.SECURE.*                                       NONE
-DATASET SYS1.SECURE.*                               ADMIN   NONE
-DATASET SYS1.SECURE.*                               RAKFADM UPDATE
-*
-* addsd  'SYS1.STGINDEX'             uacc(none)
-*
-DATASET SYS1.STGINDEX                                       NONE
-*
-* addsd  'SYS1.UCAT.TSO'             uacc(update)
-*
-DATASET SYS1.UCAT.TSO                                       UPDATE
-*
-* rdefine facility ddtapfauth uacc(none)
-* permit ddtapfauth cl(facility) id(admin,stcgroup) access(read)
-*
-FACILITYDDTAPFAUTH                                          NONE
-FACILITYDDTAPFAUTH                                  ADMIN   READ
-FACILITYDDTAPFAUTH                                  STCGROUPREAD
-*
-* rdefine facility diag8cmd uacc(none)
-* permit diag8cmd cl(facility) id(admin,stcgroup) access(read)
-*
-FACILITYDIAG8CMD                                            NONE
-FACILITYDIAG8CMD                                    ADMIN   READ
-FACILITYDIAG8CMD                                    STCGROUPREAD
-*
-* rdefine facility dssauth uacc(none)
-* permit dssauth cl(facility) id(admin,stcgroup) access(read)
-*
-FACILITYDSSAUTH                                             NONE
-FACILITYDSSAUTH                                     ADMIN   READ
-FACILITYDSSAUTH                                     STCGROUPREAD
-*
-* rdefine facility etpsauth uacc(none)
-* permit etpsauth cl(facility) id(admin,stcgroup) access(read)
-*
-FACILITYETPSAUTH                                            NONE
-FACILITYETPSAUTH                                    ADMIN   READ
-FACILITYETPSAUTH                                    STCGROUPREAD
-*
-* rdefine facility jrpauth uacc(none)
-* permit jrpauth cl(facility) id(admin,stcgroup) access(read)
-*
-FACILITYJRPAUTH                                             NONE
-FACILITYJRPAUTH                                     ADMIN   READ
-FACILITYJRPAUTH                                     STCGROUPREAD
-*
-* rdefine facility nonqauth uacc(none)
-* permit nonqauth cl(facility) id(admin,stcgroup) access(read)
-*
-FACILITYNONQAUTH                                            NONE
-FACILITYNONQAUTH                                    ADMIN   READ
-FACILITYNONQAUTH                                    STCGROUPREAD
-*
-* rdefine facility pgmauth uacc(none)
-* permit pgmauth cl(facility) id(admin,stcgroup) access(read)
-*
-FACILITYPGMAUTH                                             NONE
-FACILITYPGMAUTH                                     ADMIN   READ
-FACILITYPGMAUTH                                     STCGROUPREAD
-*
-* rdefine facility rakfadm uacc(none)
-* permit rakfadm cl(facility) id(admin)            access(none)
-* permit rakfadm cl(facility) id(rakfadm,stcgroup) access(read)
-*
-FACILITYRAKFADM                                             NONE
-FACILITYRAKFADM                                     ADMIN   NONE
-FACILITYRAKFADM                                     RAKFADM READ
-FACILITYRAKFADM                                     STCGROUPREAD
-*
-* rdefine facility showauth uacc(none)
-* permit showauth cl(facility) id(admin,stcgroup) access(read)
-*
-FACILITYSHOWAUTH                                            NONE
-FACILITYSHOWAUTH                                    ADMIN   READ
-FACILITYSHOWAUTH                                    STCGROUPREAD
-*
-* rdefine facility stepauth uacc(none)
-* permit stepauth cl(facility) id(admin,stcgroup) access(read)
-*
-FACILITYSTEPAUTH                                            NONE
-FACILITYSTEPAUTH                                    ADMIN   READ
-FACILITYSTEPAUTH                                    STCGROUPREAD
-*
-* rdefine facility svc244 uacc(none)
-* permit svc244 cl(facility) id(admin,stcgroup) access(read)
-*
-FACILITYSVC244                                              NONE
-FACILITYSVC244                                      ADMIN   READ
-FACILITYSVC244                                      STCGROUPREAD
-*
-* rdefine tapevol * uacc(read)
-* permit * cl(tapevol) id(admin,stcgroup) access(alter)
-*
-TAPEVOL *                                                   READ
-TAPEVOL *                                           ADMIN   ALTER
-TAPEVOL *                                           STCGROUPALTER
-*
-* rdefine terminal * uacc(read)
-*
-TERMINAL*                                                   READ
+APPL    STF                                                 READ                
+DASDVOL *                                                   READ                
+DASDVOL *                                           ADMIN   ALTER               
+DASDVOL *                                           STCGROUPALTER               
+DATASET *                                                   READ                
+DATASET *                                           ADMIN   ALTER               
+DATASET *                                           STCGROUPALTER               
+DATASET HTTPD.*                                             READ                
+DATASET HTTPD.*                                     UFSD    UPDATE              
+DATASET IPCS.DATA.SET.DIRECTRY                              UPDATE              
+DATASET IPCS.PROBLEM.DIRECTRY                               UPDATE              
+DATASET RAKF.*                                              NONE                
+DATASET RAKF.*                                      ADMIN   ALTER               
+DATASET SYS1.BRODCAST                                       UPDATE              
+DATASET SYS1.MCAT.*                                         READ                
+DATASET SYS1.MCAT.*                                 ADMIN   UPDATE              
+DATASET SYS1.MCAT.*                                 RAKFADM UPDATE              
+DATASET SYS1.PAGE.*                                         NONE                
+DATASET SYS1.SECURE.*                                       NONE                
+DATASET SYS1.SECURE.*                               RAKFADM UPDATE              
+DATASET SYS1.STGINDEX                                       NONE                
+DATASET SYS1.UCAT.TK5                                       UPDATE              
+DATASET SYS1.UCAT.TSO                                       UPDATE              
+DATASET TK5MIG.*                                            READ                
+DATASET TK5MIG.*                                    ADMIN   UPDATE              
+DATASET TK5MIG.*                                    RAKFADM UPDATE              
+DATASET USERMOD.*                                           NONE                
+DATASET USERMOD.*                                   ADMIN   ALTER               
+FACILITY$STF.*                                              NONE                
+FACILITY$STF.*                                      ADMIN   READ                
+FACILITY$STF.*                                      STARTED READ                
+FACILITY$STF.STFCMD1                                        NONE                
+FACILITY$STF.STFCMD1                                ADMIN   READ                
+FACILITY$STF.STFCMD1                                STARTED READ                
+FACILITY$STF.STFCMD2                                        NONE                
+FACILITY$STF.STFCMD2                                ADMIN   READ                
+FACILITY$STF.STFCMD2                                STARTED READ                
+FACILITY$STF.STFCMD3                                        NONE                
+FACILITY$STF.STFCMD3                                ADMIN   READ                
+FACILITY$STF.STFCMD3                                STARTED READ                
+FACILITY$TSTVS                                              NONE                
+FACILITY$TSTVS                                      ADMIN   READ                
+FACILITY$TSTVS                                      STCGROUPREAD                
+FACILITYDDTAPFAUTH                                          NONE                
+FACILITYDDTAPFAUTH                                  ADMIN   READ                
+FACILITYDDTAPFAUTH                                  STCGROUPREAD                
+FACILITYDIAG8CMD                                            NONE                
+FACILITYDIAG8CMD                                    ADMIN   READ                
+FACILITYDIAG8CMD                                    STCGROUPREAD                
+FACILITYDSSAUTH                                             NONE                
+FACILITYDSSAUTH                                     ADMIN   READ                
+FACILITYDSSAUTH                                     STCGROUPREAD                
+FACILITYETPSAUTH                                            NONE                
+FACILITYETPSAUTH                                    ADMIN   READ                
+FACILITYETPSAUTH                                    STCGROUPREAD                
+FACILITYFTPAUTH                                             NONE                
+FACILITYFTPAUTH                                     ADMIN   READ                
+FACILITYJRPAUTH                                             NONE                
+FACILITYJRPAUTH                                     ADMIN   READ                
+FACILITYJRPAUTH                                     STCGROUPREAD                
+FACILITYMVSMF.CONSOLE                                       NONE                
+FACILITYMVSMF.CONSOLE                               ADMIN   READ                
+FACILITYNONQAUTH                                            NONE                
+FACILITYNONQAUTH                                    ADMIN   READ                
+FACILITYNONQAUTH                                    STCGROUPREAD                
+FACILITYPGMAUTH                                             NONE                
+FACILITYPGMAUTH                                     ADMIN   READ                
+FACILITYPGMAUTH                                     STCGROUPREAD                
+FACILITYRAKFADM                                             NONE                
+FACILITYRAKFADM                                     ADMIN   NONE                
+FACILITYRAKFADM                                     RAKFADM READ                
+FACILITYRAKFADM                                     STCGROUPREAD                
+FACILITYSDSF.OPER                                           READ                
+FACILITYSDSF.OPER                                   ADMIN   UPDATE              
+FACILITYSHOWAUTH                                            NONE                
+FACILITYSHOWAUTH                                    ADMIN   READ                
+FACILITYSHOWAUTH                                    STCGROUPREAD                
+FACILITYSTEPAUTH                                            NONE                
+FACILITYSTEPAUTH                                    ADMIN   READ                
+FACILITYSTEPAUTH                                    STCGROUPREAD                
+FACILITYSVC244                                              NONE                
+FACILITYSVC244                                      ADMIN   READ                
+FACILITYSVC244                                      STARTED READ                
+FACILITYZOSMF                                               READ                
+JESSPOOL*                                                   READ                
+JESSPOOL*                                           ADMIN   UPDATE              
+TAPEVOL *                                                   READ                
+TAPEVOL *                                           ADMIN   ALTER               
+TAPEVOL *                                           STCGROUPALTER               
+TERMINAL*                                                   READ                
+
 ```
 
 This controls access to "classes" if you are familiar with RACF and can be
