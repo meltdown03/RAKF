@@ -1,9 +1,11 @@
 ./ ALIAS NAME=AU                                                                
 )F FUNCTION -                                                                   
   The ADDUSER command defines a new RAKF user.  It writes one line per          
-  group into the USERS member of SYS1.SECURE.CNTL and a record into             
-  SYS1.SECURE.SHADOW holding an 8 byte salt and sha-256(salt||password).        
-  no clear text password is ever stored.  The command fails if the user         
+  group into the USERS member of SYS1.SECURE.CNTL.                              
+  The first record of the RAKF user (record type 1) holds an                    
+  8 byte salt and sha-256(salt||password) + the OPERATIONS and SPECIAL          
+  authority (Y or N).                                                           
+  No clear text password is ever stored.  The command fails if the user         
   already exists - use ALTUSER to change one.                                   
                                                                                 
   ADDUSER updates the control data sets on disk only.  Reload the in            
@@ -18,6 +20,8 @@
   ADDUSER userid PASSWORD(pw) DFLTGRP(group)                                    
           | GROUP(g2 g3 ...) | OPERATIONS   | SPECIAL                           
                              | NOOPERATIONS | NOSPECIAL                         
+                                                                                
+  ALIAS - AU                                                                    
                                                                                 
   REQUIRED - userid, PASSWORD, DFLTGRP                                          
   DEFAULT  - NOOPERATIONS, NOSPECIAL                                            
@@ -57,25 +61,24 @@
   the step fails with rc=12 and an empty SYSTSPRT - no message at all           
   explaining why.                                                               
                                                                                 
-  USERS and SHADOW are dynamically allocated. SYS1.SECURE.* is                  
+  USERS is dynamically allocated. SYS1.SECURE.CNTL is                           
   protected with UACC(NONE), so the user needs the RAKFADM group.               
-  The command reports "RAKFUSER access denied" or                               
-  "RAKFSHAD access denied" if trying to run with a group other                  
-  than RAKFADM.                                                                 
+  The command reports "RAKFUSER access denied" if trying to run                 
+  with a group other than RAKFADM.                                              
                                                                                 
   RETURN CODES:                                                                 
                                                                                 
      0 - The user was added.                                                    
      8 - An error occurs. A suitable message will be given to                   
          the user.                                                              
-                                                                                 
-   SPECIAL REQUIREMENTS:                                                         
-                                                                                 
-      The issuing user should have the SPECIAL authority.                        
-      Update access to the SYS1.SECURE.* dataset is necessary or                 
-      the issuing user should have the OPERATIONS authority along                
-      with the SPECIAL authority.                                                
-                                                                                 
+                                                                                
+  SPECIAL REQUIREMENTS:                                                         
+                                                                                
+     The issuing user should have the SPECIAL authority.                        
+     Update access to the SYS1.SECURE.* dataset is necessary or                 
+     the issuing user should have the OPERATIONS authority along                
+     with the SPECIAL authority.                                                
+                                                                                
 )O OPERANDS -                                                                   
 ))USERID - the user to create.  1 to 8 characters.  Required, and must          
   be the first operand.  If a user of this name already exists the              
@@ -96,7 +99,7 @@
   At most 5 groups are kept.                                                    
   An alias of GROUP is GRP.                                                     
 ))OPERATIONS - marks every line of the user with the operations                 
-  attribute (Y).  Optional.  The default is NOOPERATIONS with                    
+  attribute (Y).  Optional.  The default is NOOPERATIONS with                   
   the attribute (N).                                                            
 ))SPECIAL - marks every line of the user with the SPECIAL attribute             
   (y).  Optional.  The default is NOSPECIAL with attribute(N).                  
