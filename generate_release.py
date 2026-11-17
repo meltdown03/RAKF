@@ -751,8 +751,6 @@ install.extend([
 _users_raw = open(_data_file(args.users, 'users.txt')).read()
 _profiles = open(_data_file(args.profiles, 'profiles.txt')).read().strip()
 user_cards = build_user_cards(_users_raw)
-sys.stderr.write('[gen] WARNING: installed RAKF programs still expect '
-                 'SYS1.SECURE.SHADOW; this stream is not ready for deployment.\n')
 sys.stderr.write('[gen] WARNING: the generated deck and JES input spool contain '
                  'password hashes; protect them accordingly.\n')
 
