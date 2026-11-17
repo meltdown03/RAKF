@@ -119,8 +119,8 @@ A JCL jobstream to install RAKF and all its components is located under this
 repos releases and is automatically generated using `generate_release.py` 
 python script. The most common arguments are:
 - `--users` use a custom users file instead of the default `users.txt`
-  (its plaintext passwords are hashed into the shadow file at generation time —
-  see *Password Hashing and the Shadow File*)
+  (its plaintext passwords are hashed into the `USERS` member at generation time —
+  see *Password Hashing*)
 - `--profiles` use a custom profiles file instead of the default `profiles.txt`
 
 The RAKF core (HLASM modules, macros, procs) ships as SMP source that MVS
@@ -130,7 +130,7 @@ assembles and link-edits on-target. Generate the install file with:
 python3 generate_release.py -u users.txt -p profiles.txt -o install_rakf.jcl
 ```
 
-The password shadow records are embedded as raw binary, so submit the file
+The USERS records are embedded as raw binary, so submit the file
 through the **EBCDIC pass-through reader** (device `001A`, port `3506`) —
 **not** the ASCII reader `3505`, which would corrupt the binary:
 
@@ -166,15 +166,14 @@ sysgen.
 
 During the process of adapting the profiles and users tables to meet your
 security requirements special attention to the protection of the
-`SYS1.SECURE.CNTL`, `SYS1.SECURE.PWUP` and 'SYS1.SECURE.SHADOW' should be paid:
+`SYS1.SECURE.CNTL` and `SYS1.SECURE.PWUP` should be paid:
 - `SYS1.SECURE.CNTL`: started tasks and the user(s) and/or group(s) responsible
   for RAKF administration need UPDATE access to this dataset.
 - `SYS1.SECURE.PWUP`: started tasks need UPDATE access to this dataset.
-- `SYS1.SECURE.SHADOW`: started tasks need UPDATE access to this dataset.
-
+  
 Passwords are **stored in the first record of the RAKF user in the USERS member**
 As of the salted
-SHA-256 password hashing (see *Password Hashing and the Shadow File* below),
+SHA-256 password hashing (see *Password Hashing* below),
 each credential lives as a salted digest in the USERS member;
 the `USERS` password column is left blank. The control
 datasets still govern who may sign on and what they may do, so users must not
@@ -247,7 +246,7 @@ operations and special as described below:
 |  9      | Record type (1 or 2)                                      |
 | 10 - 17 | User Group (Installation defined)                         |
 | 18      | Asterisk '*' multiple user groups exist for this userid.  |
-| 19 - 26 | Password (not used, moved to SYS1.SECURE.SHADOW)          |
+| 19 - 26 | Password (not used, moved to column 32)                   |
 | 28      | Operations Authority (Y or N). Always allow access¹       |
 |         | (only if record type = 1)                                 |
 | 30      | Special Authority (Y, N, or blank). RAKF admin authorities|
@@ -264,9 +263,9 @@ managers who oversee the work of several programming groups.  The
 multiple group arrangement gives these managers access to everything
 done by all the groups under them.
 
-> :information_source: **Passwords are kept in the `USERS` table but encryted.**
+> :information_source: **Passwords are kept in the `USERS` table but encrypted.**
 > The password column (columns 19–26) is left blank; the actual credential is a
-> salted SHA-256 digest held in the shadow file (see below). The example above
+> salted SHA-256 digest held in the `USERS`member (see below). The example above
 > shows the historical clear-text layout for reference only.
 
 ### Password Hashing 
@@ -295,7 +294,7 @@ The SHA-256 implementation is pure S/370 HLASM (`RAKFHASH`, validated against
 the NIST FIPS 180-4 test vectors) wrapped by `RAKFPWH`, which builds
 `salt || password` and calls it. Both the sign-on path (`ICHSFR00`) and the
 enrollment tools call the *same* routine, so a stored digest and a login
-attempt are compared byte-for-byte. `RAKFUSER` loads the shadow file into the
+attempt are compared byte-for-byte. `RAKFUSER` loads the `USERS` member into the
 in-core user table via the `RAKFUSER` DD at IPL.
 
 **Initial users are seeded at install time.** You still write plaintext
@@ -303,8 +302,8 @@ passwords in the `users.txt` file (column 19–26, as shown above), but
 `generate_release.py` does not copy them onto the system. When it builds the
 install stream it hashes each password host-side — SHA-256 over the same
 EBCDIC bytes RAKF uses, so the result is identical to `RAKFPWH` — blanks the
-`USERS` password column, and emits the shadow records into the stream, which
-the install loads into `SYS1.SECURE.SHADOW`. No clear-text password ever
+`USERS` password column, and emits the users records into the stream, which
+the install loads into `SYS1.SECURE.CNTL(USERS)`. No clear-text password ever
 reaches the system, and no chicken-and-egg with the tools below: the initial
 credentials exist before `ADDUSER`/`ALTUSER` are ever run. (This means
 `users.txt` itself contains live credentials — keep it protected off-system.)
@@ -313,7 +312,7 @@ credentials exist before `ADDUSER`/`ALTUSER` are ever run. (This means
 
 Users are created and changed with two RACF-style command processors,
 `ADDUSER` and `ALTUSER`, installed in `SYS1.CMDLIB`. They write the `USERS`
-member of `SYS1.SECURE.CNTL` and the `SYS1.SECURE.SHADOW` shadow file, and they
+member of `SYS1.SECURE.CNTL`, and they
 discover those dataset names at run time by reading the `RAKFUSER`/`RAKFPROF`
 procs in `SYS1.PROCLIB`.
 DELUSER deletes a UserId or disconnect a user from a GROUP.
@@ -351,8 +350,8 @@ PASSWORD may be coded as PWD, GROUP as GRP and DFLTGRP as DGRP.
 ```
 
 - **ADDUSER** adds one `USERS` line per group (the `DFLTGRP` line is flagged as
-  the default), generates a salt, hashes `PASSWORD(pw)`, and writes the shadow
-  record. `PASSWORD` and `DFLTGRP` are required; it fails if the user exists.
+  the default), generates a salt, hashes `PASSWORD(pw)`, and writes this in the
+  User record. `PASSWORD` and `DFLTGRP` are required; it fails if the user exists.
 - **ALTUSER** changes an existing user: `PASSWORD` re-hashes with a fresh salt,
   `DFLTGRP` moves the default-group flag, and the flags toggle operations/special.
 - **DELUSER** removes a user from SYS1.SECURE.CNTL(USERS).
@@ -643,7 +642,7 @@ STCGROUP groups are controlled by the profiles table.
 Both STCGROUP and PRODGROUP have the **NOSPECIAL** authority.
 
 To avoid the default STC UserID and STCGROUP group, STCs can be defined in
-SYS1.SECURE.CNTL(USERS) and SYS1.SECURE.SHADOW with the ADDUSER command.
+SYS1.SECURE.CNTL(USERS) with the ADDUSER command.
 The UserID is same as the STC procedure name.
 So, definition of own authorities for STCs are possible and recommended.
 
