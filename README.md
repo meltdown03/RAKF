@@ -990,8 +990,8 @@ changed.
   `RAKFSHAD` DD, added to `MSTJCL00` by the reworked usermod `ZJW0003`.
 - Define the Class Descriptor table in RACSTAT and test all classes against
   this table.
-- New `ADDUSER`, `ALTUSER', 'DELUSER', 'LISTUSER', 'ADDSD', 'RDEFINE', 'PERMIT',
-  'RDELETE' and 'LISTP' command processors, installed into
+- New `ADDUSER`, `ALTUSER`, `DELUSER`, `LISTUSER`, `ADDSD`, `RDEFINE`, `PERMIT`,
+  `RDELETE` and `LISTP` command processors, installed into
   `SYS1.CMDLIB`, with TSO HELP members in `SYS2.HELP`. They locate the
   control datasets with TSO **IKJDAIR** dynamic allocation, so no DD
   statements are required.
