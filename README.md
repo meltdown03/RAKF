@@ -588,12 +588,12 @@ including the Universal Access record.
 LISTP profile or the beginning part of the profile
 Example output:
 listp rakf                                                         
-LISTP: Class=FACILITY Resource=RAKFADM                  UACC=NONE 
+LISTP: Class=FACILITY Resource=RAKFADM UACC=NONE 
        Access list:                                               
        ADMIN    NONE                                              
        RAKFADM  READ                                              
        STCGROUP READ                                              
-LISTP: Class=DATASET  Resource=RAKF.*                   UACC=NONE 
+LISTP: Class=DATASET  Resource=RAKF.* UACC=NONE 
        Access list:                                               
        ADMIN    ALTER                                             
        RAKFADM  ALTER                                             
@@ -685,7 +685,7 @@ These authorities give the UserID extra possibilities.
 
 - A user with the SPECIAL authority is allowed to administer RAKF by
   managing users and profiles and allow to use the TSO commands
-  ADDUSER, ALTUSER, DELUSER, LISTUSER, ADDSD, RDEFINE, PERMIT and RDELETE.
+  ADDUSER, ALTUSER, CONNECT, DELUSER, LISTUSER, ADDSD, RDEFINE, PERMIT, RDELETE and LISTP.
 
 - A user with both OPERATIONS and SPECIAL authorities runs in God mode,
   and is allowed to access all resources and all RAKF administration.
@@ -989,7 +989,7 @@ changed.
   `RAKFSHAD` DD, added to `MSTJCL00` by the reworked usermod `ZJW0003`.
 - Define the Class Descriptor table in RACSTAT and test all classes against
   this table.
-- New `ADDUSER`, `ALTUSER`, `DELUSER`, `LISTUSER`, `ADDSD`, `RDEFINE`, `PERMIT`,
+- New `ADDUSER`, `ALTUSER`, `CONNECT`, `DELUSER`, `LISTUSER`, `ADDSD`, `RDEFINE`, `PERMIT`,
   `RDELETE` and `LISTP` command processors, installed into
   `SYS1.CMDLIB`, with TSO HELP members in `SYS2.HELP`. They locate the
   control datasets with TSO **IKJDAIR** dynamic allocation, so no DD
@@ -1001,9 +1001,9 @@ changed.
   `generate_release.py` blanks the password column and emits the shadow
   records into the install stream, so no clear-text password reaches the
   system and there is no chicken-and-egg with the tools above.
-- Rename RAKFUSER to its original name CJYRUIDS with alias RAKFUSER.
-- Rename RAKFPROF to its original name CJYRPROF with alias RAKFPROF and check the class names against the CDT.
-- Rename RAKFPWUP to CJYPWUP and call CJYRUIDS to process the changed passwords immediately.
+- Rename 'RAKFUSER` to its original name `CJYRUIDS` with alias `RAKFUSER`.
+- Rename `RAKFPROF` to its original name `CJYRPROF` with alias `RAKFPROF` and check the class names against the CDT.
+- Rename `RAKFPWUP` to `CJYPWUP` and call `CJYRUIDS` to process the changed passwords immediately.
 - Bring the SAMPLIB members back into the system.
 
 
@@ -1012,12 +1012,12 @@ changed.
 - The SYS1.SECURE.SHADOW has been deleted.
 - The sha256(salt || password) is stored in record type 1 of the RAKF user
   in the USERS member in SYS1.SECURE.CNTL.
-- The TSO commands ADDUSER, ALTUSER, DELUSER and CONNECT are updated to use the
+- The TSO commands `ADDUSER`, `ALTUSER`, `DELUSER` and `CONNECT` are updated to use the
   USERS member and to eliminate the SHADOW data set.
-- The modules RAKFPSAV and CJYRUIDS (alias RAKFUSER) are updated to eliminate SYS1.SECURE.SHADOW.
-- The module ICHSEC00 is updated with the new version of RAKF.
-- The HELP members of ADDUSER, ALTUSER and DELUSER are updated.
-- Usermod ZJW0003 is updated to eliminate SYS1.SECURE.SHADOW.
+- The modules `RAKFPSAV` and `CJYRUIDS` (alias `RAKFUSER`) are updated to eliminate `SYS1.SECURE.SHADOW`.
+- The module `ICHSEC00` is updated with the new version of RAKF.
+- The HELP members of `ADDUSER`, `ALTUSER` and `DELUSER` are updated.
+- Usermod ZJW0003 is updated to eliminate `SYS1.SECURE.SHADOW`.
 
 ## Appendix A - Generating your own release
 
