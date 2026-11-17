@@ -3,8 +3,9 @@
   The ALTUSER command changes an existing RAKF user.  It can set a new          
   password, move the default group flag, and turn the OPERATIONS and            
   SPECIAL attributes on or off.  A new password is re-hashed with a             
-  fresh salt and replaces the record in SYS1.SECURE.SHADOW; no clear            
-  text password is ever stored.                                                 
+  fresh salt and updates the first record of the RAKF user with the             
+  new sha256(salt/password).                                                    
+  No clear passwords will be stored.                                            
                                                                                 
   At least one change must be requested.  If none is, the command ends          
   and the user receives the message "ALTUSER: userid is not altered".           
@@ -25,6 +26,8 @@
   ALTUSER USERID | PASSWORD(PW) | DFLTGRP(GROUP)                                
           | OPERATIONS   | SPECIAL                                              
           | NOOPERATIONS | NOSPECIAL                                            
+                                                                                
+  ALIAS - ALU                                                                   
                                                                                 
   Required - Userid, plus at least one of the other operands                    
   Default  - Any attribute not named is left unchanged                          
@@ -60,32 +63,31 @@
   The step fails with RC=8 - The user will be notified with                     
   a suitable message.                                                           
                                                                                 
-  USERS and SHADOW are dynamically allocated. SYS1.SECURE.* is                  
+  USERS is dynamically allocated. SYS1.SECURE.CNTL is                           
   protected with UACC(NONE), so the user needs the RAKFADM group.               
-  The command reports "RAKFUSER access denied" or                               
-  "RAKFSHAD access denied" if trying to run with a group other                  
-  than RAKFADM.                                                                 
+  The command reports "RAKFUSER access denied" id trying to run                 
+  with a group other than RAKFADM.                                              
                                                                                 
   RETURN CODES:                                                                 
                                                                                 
      0 - The user was altered.                                                  
      8 - An error occurs. A suitable message will be given to                   
          the user.                                                              
-                                                                                 
-   SPECIAL REQUIREMENTS:                                                         
-                                                                                 
-      The issuing user should have the SPECIAL authority.                        
-      Update access to the SYS1.SECURE.* dataset is necessary or                 
-      the issuing user should have the OPERATIONS authority along                
-      with the SPECIAL authority.                                                
-                                                                                 
+                                                                                
+  SPECIAL REQUIREMENTS:                                                         
+                                                                                
+     The issuing user should have the SPECIAL authority.                        
+     Update access to the SYS1.SECURE.* dataset is necessary or                 
+     the issuing user should have the OPERATIONS authority along                
+     with the SPECIAL authority.                                                
+                                                                                
 )O OPERANDS -                                                                   
 ))USERID - The user to change.  1 to 8 characters.  Required, and must          
   be the first operand.                                                         
 ))PASSWORD - PASSWORD(pw) replaces the password.  Optional.  1 to 8             
-  characters.  A fresh salt is generated and the SHADOW record is               
-  rewritten, so the old password stops working as soon as the in core           
-  tables are reloaded.                                                          
+  characters.  A fresh salt is generated and the first USERS record             
+  of the RAKF user will be rewritten (the record type 1), so the old            
+  password stops working as soon as the in core tables are reloaded.            
   An alias of PASSWORD is PWD.                                                  
 ))DFLTGRP - DFLTGRP(group) moves the '*' default flag to the named              
   group. Optional. The user must already be connected to that group;            
