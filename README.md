@@ -1,13 +1,19 @@
-# RAKF Version 2 Release 0 Modification 0
+# RAKF Version 2 Release 1 Modification 0
 
 A Security System for MVS 3.8j
 
 ## User’s Guide
 
 > [!IMPORTANT]
-> New for version 2.0.0 users are hashed and stores in a shadow file. 
-> as a result adding new users requires using the TSO command ADDUSER
-> and changing requires ALTUSER. Read the HELP/ files for more defails 
+> New for version 2.1.0 passwords are hashed and stores in the USERS member. 
+> as a result adding new users requires using the TSO command ADDUSER,
+> changing requires ALTUSER, deleting requires DELUSER and listing
+> requires LISTUSER. Read the HELP/ files for more details
+>
+> The PROFILES member is controlled by the TSO commands ADDSD
+> (add DATASET profile), RDEFINE (add generalized resource profiles),
+> PERMIT (to grant access to a profile), RDELETE (to delete an access
+> rule or an entire profile) and LISTP to list profiles.
 
 October 2026
 
@@ -24,7 +30,7 @@ October 2026
 *    adapted to MVS 3.8J: A. Philip Dickinson (Aug 2005)             *
 *                         Phil Roberts        (Apr 2011)             *
 *                         Jürgen Winkelmann   (Apr 2011)             *
-*                         Rob Prins           (Sep 2026)             *
+*                         Rob Prins           (Nov 2026)             *
 *                                                                    *
 **********************************************************************
 *                                                                    *
@@ -166,19 +172,19 @@ security requirements special attention to the protection of the
 - `SYS1.SECURE.PWUP`: started tasks need UPDATE access to this dataset.
 - `SYS1.SECURE.SHADOW`: started tasks need UPDATE access to this dataset.
 
-Passwords are **no longer stored in these datasets**. As of the salted
+Passwords are **stored in the first record of the RAKF user in the USERS member**
+As of the salted
 SHA-256 password hashing (see *Password Hashing and the Shadow File* below),
-each credential lives as a salted digest in a separate shadow file,
-`SYS1.SECURE.SHADOW`; the `USERS` password column is left blank. The control
+each credential lives as a salted digest in the USERS member;
+the `USERS` password column is left blank. The control
 datasets still govern who may sign on and what they may do, so users must not
 be allowed access to them. An easy way to protect them is to define a dataset
 profile `SYS1.SECURE.*` with universal access NONE and selectively allow the
-RAKF administrator user(s)/group(s) `UPDATE` access to this profile. That
-profile also covers `SYS1.SECURE.SHADOW`, which should always be `UACC(NONE)`.
+RAKF administrator user(s)/group(s) `UPDATE` access to this profile.
 If the standard setup is used started tasks have OPERATIONS and the NOSPECIAL
 authority and thus don't need to be explicitly allowed.
 
-## Users and Profiles Tables and SHADOW data set.
+## Users and Profiles Tables.
 
 
 In order for the profiles tables to be valid, it must be in
@@ -222,14 +228,14 @@ stopped upon the first hit.
 Below is an example `USERS` table:
 
 ```
-----.----1----.----2----.----3     
-HMVS01   ADMIN   *         Y Y
-HMVS01   RAKFADM           Y Y
-HERC01   ADMIN   *         Y Y
-HERC01   RAKFADM           Y Y
-HMVS02   USER              N N
-IBMUSER  ADMIN   *         Y Y
-IBMUSER  RAKFADM *         Y Y
+----.----1----.----2----.----3----.----4----.----5----.----6----.----7.     
+HMVS01  11ADMIN  *         Y Y sssssssspppppppppppppppppppppppppppppppp
+HMVS01  2RAKFADM         
+HERC01  1ADMIN   *         Y Y sssssssspppppppppppppppppppppppppppppppp
+HERC01  2RAKFADM
+HMVS02  1USER              N N sssssssspppppppppppppppppppppppppppppppp
+IBMUSER 1ADMIN   *         Y Y sssssssspppppppppppppppppppppppppppppppp
+IBMUSER 2RAKFADM 
 ```
 
 This controls user access. Each line is a user, group, password,
@@ -238,39 +244,36 @@ operations and special as described below:
 | Column  | Description                                               |
 |:-------:|:----------------------------------------------------------|
 |  1 -  8 | USERID                                                    |
+|  9      | Record type (1 or 2)                                      |
 | 10 - 17 | User Group (Installation defined)                         |
 | 18      | Asterisk '*' multiple user groups exist for this userid.  |
 | 19 - 26 | Password (not used, moved to SYS1.SECURE.SHADOW)          |
 | 28      | Operations Authority (Y or N). Always allow access¹       |
+|         | (only if record type = 1)                                 |
 | 30      | Special Authority (Y, N, or blank). RAKF admin authorities|
-| 31 - 50 | Comment field (used by "IBM RACF").                       |
+|         | (only if record type = 1)                                 |
+| 32 - 39 | salt (only if record type = 1)                            |
+| 40 - 71 | sha256 hashed password (only if record type = 1)          |
 
 *1* Unless explicitly denied access via a rule
 
-Each line can be broken down as:
-
-```
-UUUUUUUU GGGGGGGGSPPPPPPPP A  CCCCCCCCCCCCCCCCCCC
-Username Group   *Password O  Comment
-```
-
-Userids in the users table that were set up with multiple group
+UserIds in the users table that were set up with multiple group
 entries will get the highest authority for all protected objects in
 all the groups. As a practical example, multiple groups are used for
 managers who oversee the work of several programming groups.  The
 multiple group arrangement gives these managers access to everything
 done by all the groups under them.
 
-> :information_source: **Passwords are no longer kept in the `USERS` table.**
+> :information_source: **Passwords are kept in the `USERS` table but encryted.**
 > The password column (columns 19–26) is left blank; the actual credential is a
 > salted SHA-256 digest held in the shadow file (see below). The example above
 > shows the historical clear-text layout for reference only.
 
-### Password Hashing and the Shadow File
+### Password Hashing 
 
 Earlier releases stored each password in clear text (obscured only by a
 reversible XOR "scramble"). Passwords are now protected with a **salted
-SHA-256** hash:
+SHA-256** hash in the USERS member.
 
 ```
 digest = SHA-256( salt || password )
@@ -283,17 +286,8 @@ digest = SHA-256( salt || password )
   so enrollment and TSO/JOB-card sign-on agree.
 - **digest** — the raw 32-byte SHA-256 result.
 
-The salt and digest are stored in the shadow file **`SYS1.SECURE.SHADOW`**, a
-sequential `RECFM=FB,LRECL=48` dataset with one 48-byte record per user:
-
-| Bytes   | Field                    |
-|:-------:|:-------------------------|
-|  1 –  8 | USERID                   |
-|  9 – 16 | Salt (8 bytes, binary)   |
-| 17 – 48 | SHA-256 digest (32 bytes)|
-
-Keeping the digests in a *separate* dataset lets you lock it down harder than
-the rest of `SYS1.SECURE.CNTL` — it should be `UACC(NONE)` so that even reading
+Keeping the digests in the USERS member lets you lock it down harder.
+The data set`SYS1.SECURE.CNTL` should be `UACC(NONE)` so that even reading
 it (an offline dictionary attack) is denied to everyone but the RAKF
 administrator.
 
@@ -302,7 +296,7 @@ the NIST FIPS 180-4 test vectors) wrapped by `RAKFPWH`, which builds
 `salt || password` and calls it. Both the sign-on path (`ICHSFR00`) and the
 enrollment tools call the *same* routine, so a stored digest and a login
 attempt are compared byte-for-byte. `RAKFUSER` loads the shadow file into the
-in-core user table via the `RAKFSHAD` DD at IPL, alongside the `USERS` table.
+in-core user table via the `RAKFUSER` DD at IPL.
 
 **Initial users are seeded at install time.** You still write plaintext
 passwords in the `users.txt` file (column 19–26, as shown above), but
@@ -361,7 +355,7 @@ PASSWORD may be coded as PWD, GROUP as GRP and DFLTGRP as DGRP.
   record. `PASSWORD` and `DFLTGRP` are required; it fails if the user exists.
 - **ALTUSER** changes an existing user: `PASSWORD` re-hashes with a fresh salt,
   `DFLTGRP` moves the default-group flag, and the flags toggle operations/special.
-- **DELUSER** removes a user from SYS1.SECURE.SHADOW and SYS1.SECURE.CNTL(USERS).
+- **DELUSER** removes a user from SYS1.SECURE.CNTL(USERS).
   if GROUP is omitted. If GROUP is specified only the GROUP will be deleted (disconnect).
 - **CONNECT** connects a UserId to a GROUP.
 - **LISTUSER** list one or more UserIds from the RAKF in core users table.
@@ -375,7 +369,7 @@ ADDUSER SMITH PASSWORD(START123) DFLTGRP(USER)
 ```
 
 —or in **batch** under the terminal monitor, invoked with `CALL` so the load
-module is found in `SYS2.CMDLIB` (keep the command within column 72, using a
+module is found in `SYS1.CMDLIB` (keep the command within column 72, using a
 TSO continuation `+` if needed):
 
 ```
@@ -400,159 +394,97 @@ Until the reload, the new or changed credential exists only on disk.
 Below is an example `PROFILES` table:
 
 ```
-************************************************
-*                                              *
-* RAKF profile definitions for TK4-            *
-*                                              *
-************************************************
-*
-* rdefine dasdvol * uacc(read)
-* permit * cl(dasdvol) id(admin,stcgroup) access(alter)
-*
-DASDVOL *                                                   READ
-DASDVOL *                                           ADMIN   ALTER
-DASDVOL *                                           STCGROUPALTER
-*
-* addsd  '*.**'                      uacc(read)
-* permit '*.**' id(admin,stcgroup)   access(alter)
-*
-DATASET *                                                   READ
-DATASET *                                           ADMIN   ALTER
-DATASET *                                           STCGROUPALTER
-*
-* addsd  'IPCS.DATA.SET.DIRECTRY'    uacc(update)
-* addsd  'IPCS.PROBLEM.DIRECTRY'     uacc(update)
-*
-DATASET IPCS.DATA.SET.DIRECTRY                              UPDATE
-DATASET IPCS.PROBLEM.DIRECTRY                               UPDATE
-*
-* addsd  'RPF.V1R5M3.SRPFPROF'       uacc(update)
-*
-DATASET RPF.V1R5M3.SRPFPROF                                 UPDATE
-*
-* addsd  'SYS1.BRODCAST'             uacc(update)
-*
-DATASET SYS1.BRODCAST                                       UPDATE
-*
-* addsd  'SYS1.DUPLEX'               uacc(none)
-* addsd  'SYS1.PAGECSA'              uacc(none)
-* addsd  'SYS1.PAGELPA'              uacc(none)
-* addsd  'SYS1.PAGEL01'              uacc(none)
-* addsd  'SYS1.PAGEL02'              uacc(none)
-* addsd  'SYS1.PAGES01'              uacc(none)
-*
-DATASET SYS1.DUPLEX                                         NONE
-DATASET SYS1.PAGECSA                                        NONE
-DATASET SYS1.PAGELPA                                        NONE
-DATASET SYS1.PAGEL01                                        NONE
-DATASET SYS1.PAGEL02                                        NONE
-DATASET SYS1.PAGES01                                        NONE
-*
-* addsd  'SYS1.SECURE.*'             uacc(none)
-* permit 'SYS1.SECURE.*' id(admin)   access(none)
-* permit 'SYS1.SECURE.*' id(rakfadm) access(update)
-*
-DATASET SYS1.SECURE.*                                       NONE
-DATASET SYS1.SECURE.*                               ADMIN   NONE
-DATASET SYS1.SECURE.*                               RAKFADM UPDATE
-*
-* addsd  'SYS1.STGINDEX'             uacc(none)
-*
-DATASET SYS1.STGINDEX                                       NONE
-*
-* addsd  'SYS1.UCAT.TSO'             uacc(update)
-*
-DATASET SYS1.UCAT.TSO                                       UPDATE
-*
-* rdefine facility ddtapfauth uacc(none)
-* permit ddtapfauth cl(facility) id(admin,stcgroup) access(read)
-*
-FACILITYDDTAPFAUTH                                          NONE
-FACILITYDDTAPFAUTH                                  ADMIN   READ
-FACILITYDDTAPFAUTH                                  STCGROUPREAD
-*
-* rdefine facility diag8cmd uacc(none)
-* permit diag8cmd cl(facility) id(admin,stcgroup) access(read)
-*
-FACILITYDIAG8CMD                                            NONE
-FACILITYDIAG8CMD                                    ADMIN   READ
-FACILITYDIAG8CMD                                    STCGROUPREAD
-*
-* rdefine facility dssauth uacc(none)
-* permit dssauth cl(facility) id(admin,stcgroup) access(read)
-*
-FACILITYDSSAUTH                                             NONE
-FACILITYDSSAUTH                                     ADMIN   READ
-FACILITYDSSAUTH                                     STCGROUPREAD
-*
-* rdefine facility etpsauth uacc(none)
-* permit etpsauth cl(facility) id(admin,stcgroup) access(read)
-*
-FACILITYETPSAUTH                                            NONE
-FACILITYETPSAUTH                                    ADMIN   READ
-FACILITYETPSAUTH                                    STCGROUPREAD
-*
-* rdefine facility jrpauth uacc(none)
-* permit jrpauth cl(facility) id(admin,stcgroup) access(read)
-*
-FACILITYJRPAUTH                                             NONE
-FACILITYJRPAUTH                                     ADMIN   READ
-FACILITYJRPAUTH                                     STCGROUPREAD
-*
-* rdefine facility nonqauth uacc(none)
-* permit nonqauth cl(facility) id(admin,stcgroup) access(read)
-*
-FACILITYNONQAUTH                                            NONE
-FACILITYNONQAUTH                                    ADMIN   READ
-FACILITYNONQAUTH                                    STCGROUPREAD
-*
-* rdefine facility pgmauth uacc(none)
-* permit pgmauth cl(facility) id(admin,stcgroup) access(read)
-*
-FACILITYPGMAUTH                                             NONE
-FACILITYPGMAUTH                                     ADMIN   READ
-FACILITYPGMAUTH                                     STCGROUPREAD
-*
-* rdefine facility rakfadm uacc(none)
-* permit rakfadm cl(facility) id(admin)            access(none)
-* permit rakfadm cl(facility) id(rakfadm,stcgroup) access(read)
-*
-FACILITYRAKFADM                                             NONE
-FACILITYRAKFADM                                     ADMIN   NONE
-FACILITYRAKFADM                                     RAKFADM READ
-FACILITYRAKFADM                                     STCGROUPREAD
-*
-* rdefine facility showauth uacc(none)
-* permit showauth cl(facility) id(admin,stcgroup) access(read)
-*
-FACILITYSHOWAUTH                                            NONE
-FACILITYSHOWAUTH                                    ADMIN   READ
-FACILITYSHOWAUTH                                    STCGROUPREAD
-*
-* rdefine facility stepauth uacc(none)
-* permit stepauth cl(facility) id(admin,stcgroup) access(read)
-*
-FACILITYSTEPAUTH                                            NONE
-FACILITYSTEPAUTH                                    ADMIN   READ
-FACILITYSTEPAUTH                                    STCGROUPREAD
-*
-* rdefine facility svc244 uacc(none)
-* permit svc244 cl(facility) id(admin,stcgroup) access(read)
-*
-FACILITYSVC244                                              NONE
-FACILITYSVC244                                      ADMIN   READ
-FACILITYSVC244                                      STCGROUPREAD
-*
-* rdefine tapevol * uacc(read)
-* permit * cl(tapevol) id(admin,stcgroup) access(alter)
-*
-TAPEVOL *                                                   READ
-TAPEVOL *                                           ADMIN   ALTER
-TAPEVOL *                                           STCGROUPALTER
-*
-* rdefine terminal * uacc(read)
-*
-TERMINAL*                                                   READ
+APPL    STF                                                 READ                
+DASDVOL *                                                   READ                
+DASDVOL *                                           ADMIN   ALTER               
+DASDVOL *                                           STCGROUPALTER               
+DATASET *                                                   READ                
+DATASET *                                           ADMIN   ALTER               
+DATASET *                                           STCGROUPALTER               
+DATASET HTTPD.*                                             READ                
+DATASET HTTPD.*                                     UFSD    UPDATE              
+DATASET IPCS.DATA.SET.DIRECTRY                              UPDATE              
+DATASET IPCS.PROBLEM.DIRECTRY                               UPDATE              
+DATASET RAKF.*                                              NONE                
+DATASET RAKF.*                                      ADMIN   ALTER               
+DATASET SYS1.BRODCAST                                       UPDATE              
+DATASET SYS1.MCAT.*                                         READ                
+DATASET SYS1.MCAT.*                                 ADMIN   UPDATE              
+DATASET SYS1.MCAT.*                                 RAKFADM UPDATE              
+DATASET SYS1.PAGE.*                                         NONE                
+DATASET SYS1.SECURE.*                                       NONE                
+DATASET SYS1.SECURE.*                               RAKFADM UPDATE              
+DATASET SYS1.STGINDEX                                       NONE                
+DATASET SYS1.UCAT.TK5                                       UPDATE              
+DATASET SYS1.UCAT.TSO                                       UPDATE              
+DATASET TK5MIG.*                                            READ                
+DATASET TK5MIG.*                                    ADMIN   UPDATE              
+DATASET TK5MIG.*                                    RAKFADM UPDATE              
+DATASET USERMOD.*                                           NONE                
+DATASET USERMOD.*                                   ADMIN   ALTER               
+FACILITY$STF.*                                              NONE                
+FACILITY$STF.*                                      ADMIN   READ                
+FACILITY$STF.*                                      STARTED READ                
+FACILITY$STF.STFCMD1                                        NONE                
+FACILITY$STF.STFCMD1                                ADMIN   READ                
+FACILITY$STF.STFCMD1                                STARTED READ                
+FACILITY$STF.STFCMD2                                        NONE                
+FACILITY$STF.STFCMD2                                ADMIN   READ                
+FACILITY$STF.STFCMD2                                STARTED READ                
+FACILITY$STF.STFCMD3                                        NONE                
+FACILITY$STF.STFCMD3                                ADMIN   READ                
+FACILITY$STF.STFCMD3                                STARTED READ                
+FACILITY$TSTVS                                              NONE                
+FACILITY$TSTVS                                      ADMIN   READ                
+FACILITY$TSTVS                                      STCGROUPREAD                
+FACILITYDDTAPFAUTH                                          NONE                
+FACILITYDDTAPFAUTH                                  ADMIN   READ                
+FACILITYDDTAPFAUTH                                  STCGROUPREAD                
+FACILITYDIAG8CMD                                            NONE                
+FACILITYDIAG8CMD                                    ADMIN   READ                
+FACILITYDIAG8CMD                                    STCGROUPREAD                
+FACILITYDSSAUTH                                             NONE                
+FACILITYDSSAUTH                                     ADMIN   READ                
+FACILITYDSSAUTH                                     STCGROUPREAD                
+FACILITYETPSAUTH                                            NONE                
+FACILITYETPSAUTH                                    ADMIN   READ                
+FACILITYETPSAUTH                                    STCGROUPREAD                
+FACILITYFTPAUTH                                             NONE                
+FACILITYFTPAUTH                                     ADMIN   READ                
+FACILITYJRPAUTH                                             NONE                
+FACILITYJRPAUTH                                     ADMIN   READ                
+FACILITYJRPAUTH                                     STCGROUPREAD                
+FACILITYMVSMF.CONSOLE                                       NONE                
+FACILITYMVSMF.CONSOLE                               ADMIN   READ                
+FACILITYNONQAUTH                                            NONE                
+FACILITYNONQAUTH                                    ADMIN   READ                
+FACILITYNONQAUTH                                    STCGROUPREAD                
+FACILITYPGMAUTH                                             NONE                
+FACILITYPGMAUTH                                     ADMIN   READ                
+FACILITYPGMAUTH                                     STCGROUPREAD                
+FACILITYRAKFADM                                             NONE                
+FACILITYRAKFADM                                     ADMIN   NONE                
+FACILITYRAKFADM                                     RAKFADM READ                
+FACILITYRAKFADM                                     STCGROUPREAD                
+FACILITYSDSF.OPER                                           READ                
+FACILITYSDSF.OPER                                   ADMIN   UPDATE              
+FACILITYSHOWAUTH                                            NONE                
+FACILITYSHOWAUTH                                    ADMIN   READ                
+FACILITYSHOWAUTH                                    STCGROUPREAD                
+FACILITYSTEPAUTH                                            NONE                
+FACILITYSTEPAUTH                                    ADMIN   READ                
+FACILITYSTEPAUTH                                    STCGROUPREAD                
+FACILITYSVC244                                              NONE                
+FACILITYSVC244                                      ADMIN   READ                
+FACILITYSVC244                                      STARTED READ                
+FACILITYZOSMF                                               READ                
+JESSPOOL*                                                   READ                
+JESSPOOL*                                           ADMIN   UPDATE              
+TAPEVOL *                                                   READ                
+TAPEVOL *                                           ADMIN   ALTER               
+TAPEVOL *                                           STCGROUPALTER               
+TERMINAL*                                                   READ                
+
 ```
 
 This controls access to "classes" if you are familiar with RACF and can be
@@ -1058,8 +990,8 @@ changed.
   `RAKFSHAD` DD, added to `MSTJCL00` by the reworked usermod `ZJW0003`.
 - Define the Class Descriptor table in RACSTAT and test all classes against
   this table.
-- New `ADDUSER`, `ALTUSER', 'DELUSER', 'LISTUSER', 'ADDSD', 'RDEFINE', PERMIT
-  and 'RDELETE' command processors, installed into
+- New `ADDUSER`, `ALTUSER', 'DELUSER', 'LISTUSER', 'ADDSD', 'RDEFINE', 'PERMIT',
+  'RDELETE' and 'LISTP' command processors, installed into
   `SYS1.CMDLIB`, with TSO HELP members in `SYS2.HELP`. They locate the
   control datasets with TSO **IKJDAIR** dynamic allocation, so no DD
   statements are required.
@@ -1074,6 +1006,19 @@ changed.
 - Rename RAKFPROF to its original name CJYRPROF with alias RAKFPROF and check the class names against the CDT.
 - Rename RAKFPWUP to CJYPWUP and call CJYRUIDS to process the changed passwords immediately.
 - Bring the SAMPLIB members back into the system.
+
+
+### RAKF 2.1.0 (November 2026)
+
+- The SYS1.SECURE.SHADOW has been deleted.
+- The sha256(salt || password) is stored in record type 1 of the RAKF user
+  in the USERS member in SYS1.SECURE.CNTL.
+- The TSO commands ADDUSER, ALTUSER, DELUSER and CONNECT are updated to use the
+  USERS member and to eliminate the SHADOW data set.
+- The modules RAKFPSAV and CJYRUIDS (alias RAKFUSER) are updated to eliminate SYS1.SECURE.SHADOW.
+- The module ICHSEC00 is updated with the new version of RAKF.
+- The HELP members of ADDUSER, ALTUSER and DELUSER are updated.
+- Usermod ZJW0003 is updated to eliminate SYS1.SECURE.SHADOW.
 
 ## Appendix A - Generating your own release
 
