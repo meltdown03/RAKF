@@ -26,8 +26,8 @@ CJYRPWUP CSECT                                                          00000200
 *             characters.                                            *  00002600
 *                                                                    *  00002700
 *             After the update in PWUP, CJYUIDS is linked to         *  00002800
-*             update USERS table and the SHADOW data set and         *  00002900
-*             to update the in storage USERS table.                  *  00003000
+*             update USERS table and to update the un storage        *  00002900
+*             USERS table.                                           *  00003000
 *                                                                    *  00003100
 *        Requirements:                                               *  00003200
 *             RAKF password change queue pointed to by ddname        *  00003300
@@ -37,110 +37,109 @@ CJYRPWUP CSECT                                                          00000200
 *        DDnames:                                                    *  00003700
 *             RAKFPWUP - The RAKF password update data set.          *  00003800
 *             RAKFUSER - The RAKF USERS table (for CJYRUIDS).        *  00003900
-*             RAKFSHAD - The RAKF SHADOW data set (for CJYRUIDS).    *  00004000
-*                                                                    *  00004100
-*   !!!!! DO NOT RENUMBER !!!!! enter NUMBER OFF before editing      *  00004200
-*                               But better is letting SMP doing      *  00004300
-*                               the EDIT.                            *  00004400
-*                                                                    *  00004500
-*--------------------------------------------------------------------*  00004600
-*                                                                       00004700
-* initialize                                                            00004800
-*                                                                       00004900
-         SAVE  (14,12),,CJYRPWUP_&SYSDATE._&SYSTIME                     00005000
-         USING CJYRPWUP,R15        Establish => program EP              00005100
-         ST    R13,SAVEAREA+4      Backward pointer                     00005200
-         LA    R11,SAVEAREA        Establish => savearea                00005300
-         ST    R11,8(,R13)         Forward pointer                      00005400
-         LR    R13,R11             Setup => our savearea                00005500
-         USING SAVEAREA,R13        New addressability                   00005600
-         DROP  R15                 Program EP no longer needed          00005700
-         B     CONTINUE            Branch around Save area              00005800
-SAVEAREA DS    18F                 Save area                            00005900
-*                                                                       00006000
-* Begin of code                                                         00006100
-*                                                                       00006200
-CONTINUE LR    R5,R1               Remember PARMLIST address            00006300
-         MODESET MODE=SUP,KEY=ZERO Authorize ourselves                  00006400
-         L     R1,0(,R5)           Address of PARM field plist          00006500
-         LH    R5,0(,R1)           Length of PARM field                 00006600
-         CH    R5,=H'8'            Is PARM field length 8 characters?   00006700
-         BNE   INVPARM             Talk dirty and exit if not           00006800
-         MVC   ADDRHEX,2(R1)       Get PARM field in check plist        00006900
-         MVC   ADDRUNPK,2(R1)      Get PARM field for translate         00007000
-         TR    ADDRUNPK,HEXTBL     Translate PARM field to zoned        00007100
-         PACK  ADDRESS(5),ADDRUNPK(9) Pack PARM field                   00007200
-         L     R1,ADDRESS          Address storage pointed to by PARM   00007300
-         CLC   0(LPWUPCMD,R1),STRTPWUP Parmlist from ICHSFR00 found?    00007400
-         BNE   INVPARM             Talk dirty and exit if not           00007500
-         MVC   PWUPUSER(8),PWUPUSER-STRTPWUP(R1) get user               00007600
-         MVC   PWUPPSWD(8),PWUPPSWD-STRTPWUP(R1) get new password       00007700
-         XC    0(LPWUP,R1),0(R1)   Clear ICHSFR00 parmlist storage      00007800
-         FREEMAIN RU,LV=LPWUP,A=ADDRESS,SP=227 Free parmlist storage    00007900
-         ENQ    (SECURITY,USERS,E,,SYSTEM),RET=HAVE serialization       00008000
-         OPEN  (QUEUE,(EXTEND))    Open password change queue           00008100
-         PUT   QUEUE,PWUP          Write entry                          00008200
-         CLOSE (QUEUE)             Close password change queue          00008300
-         DEQ   (SECURITY,USERS,,SYSTEM) Release ENQ                     00008400
-         MVC   SUCCESS+38(8),PWUPUSER Move user into success message    00008500
-         WTO   MF=(E,SUCCESS)      Tell operator                        00008600
-         B     RETURN                                                   00008700
-INVPARM  WTO   'RAKF006W invalid password update request ignored'       00008800
-         B     RETURN1             Return, but do not link CJYRUIDS     00008900
-*                                                                       00009000
-*        Link to CJYRUIDS (RAKFUSER) to update the USERS table in core  00009100
-*        and return.                                                    00009200
-*                                                                       00009300
-RETURN   MODESET MODE=PROB,KEY=NZERO return to problem state            00009400
-         LA    R1,USERPRM          Parameter for CJYRUIDS               00009500
-         LINK  EP=CJYRUIDS         Update USERS table in core           00009600
-RETURN1  L     R13,SAVEAREA+4      Get caller's savearea                00009700
-         RETURN (14,12),,RC=0      Return                               00009800
-*                                                                       00009900
-* data area                                                             00010000
-*                                                                       00010100
-STRTPWUP DC    AL2(LPWUPCMD)       Parameter list that must have been.. 00010200
-         DC    X'0000'               .. used to start this RAKFPWUP ..  00010300
-         DC    C'S RAKFPWUP,PARM=''' .. run. This is used to perform .. 00010400
-ADDRHEX  DS    CL8                   .. a validity check of the CSA ..  00010500
-         DC    C''''                 .. storage addressed through ..    00010600
-LPWUPCMD EQU   *-STRTPWUP            .. the PARM field                  00010700
-PWUP     DS    0C                  Changes queue record                 00010800
-PWUPUSER DC    CL8' '              Userid                               00010900
-         DC    C' '                Filler                               00011000
-PWUPPSWD DC    CL8' '              New password                         00011100
-         DC    C' '                Filler                               00011200
-CHGLRECL EQU   *-PWUP              Record length of changes queue       00011300
-LPWUP    EQU   *-STRTPWUP          Total length of CSA area             00011400
-ADDRUNPK DS    CL8                 Unpacked address                     00011500
-         DC    X'C0'               sign and dummy digit                 00011600
-ADDRESS  DS    F                   packed address                       00011700
-         DS    X                   dummy digit and sign after pack      00011800
-SECURITY DC    CL8'CJYRCVT'        Resource name for ENQ                00011900
-USERS    DC    CL8'CJYUSRS'        Resource name for ENQ                00012000
-QUEUE    DCB   DDNAME=RAKFPWUP,MACRF=PM,DSORG=PS password change queue  00012100
-SUCCESS  WTO   'RAKF007I password update for user UUUUUUUU queued',MF=L 00012200
-USERP    DC    H'0'                For CJYRUIDS                         00012300
-USERPRM  DC    A(USERP)                                                 00012400
-*                 0 1 2 3 4 5 6 7 8 9 A B C D E F                       00012500
-HEXTBL   DC    X'00000000000000000000000000000000' 0                    00012600
-         DC    X'00000000000000000000000000000000' 1                    00012700
-         DC    X'00000000000000000000000000000000' 2                    00012800
-         DC    X'00000000000000000000000000000000' 3                    00012900
-         DC    X'00000000000000000000000000000000' 4                    00013000
-         DC    X'00000000000000000000000000000000' 5 translate table    00013100
-         DC    X'00000000000000000000000000000000' 6 to convert CSA     00013200
-         DC    X'00000000000000000000000000000000' 7 address from PARM  00013300
-         DC    X'00000000000000000000000000000000' 8 field to zoned     00013400
-         DC    X'00000000000000000000000000000000' 9 format             00013500
-         DC    X'00000000000000000000000000000000' A                    00013600
-         DC    X'00000000000000000000000000000000' B                    00013700
-         DC    X'00FAFBFCFDFEFF000000000000000000' C                    00013800
-         DC    X'00000000000000000000000000000000' D                    00013900
-         DC    X'00000000000000000000000000000000' E                    00014000
-         DC    X'F0F1F2F3F4F5F6F7F8F9000000000000' F                    00014100
-*                                                                       00014200
-* Equates                                                               00014300
-*                                                                       00014400
-         YREGS                     Register equates                     00014500
-         END   CJYRPWUP            End of program                       00014600
+*                                                                    *  00004000
+*   !!!!! DO NOT RENUMBER !!!!! enter NUMBER OFF before editing      *  00004100
+*                               But better is letting SMP doing      *  00004200
+*                               the EDIT.                            *  00004300
+*                                                                    *  00004400
+*--------------------------------------------------------------------*  00004500
+*                                                                       00004600
+* initialize                                                            00004700
+*                                                                       00004800
+         SAVE  (14,12),,CJYRPWUP_&SYSDATE._&SYSTIME                     00004900
+         USING CJYRPWUP,R15        Establish => program EP              00005000
+         ST    R13,SAVEAREA+4      Backward pointer                     00005100
+         LA    R11,SAVEAREA        Establish => savearea                00005200
+         ST    R11,8(,R13)         Forward pointer                      00005300
+         LR    R13,R11             Setup => our savearea                00005400
+         USING SAVEAREA,R13        New addressability                   00005500
+         DROP  R15                 Program EP no longer needed          00005600
+         B     CONTINUE            Branch around Save area              00005700
+SAVEAREA DS    18F                 Save area                            00005800
+*                                                                       00005900
+* Begin of code                                                         00006000
+*                                                                       00006100
+CONTINUE LR    R5,R1               Remember PARMLIST address            00006200
+         MODESET MODE=SUP,KEY=ZERO Authorize ourselves                  00006300
+         L     R1,0(,R5)           Address of PARM field plist          00006400
+         LH    R5,0(,R1)           Length of PARM field                 00006500
+         CH    R5,=H'8'            Is PARM field length 8 characters?   00006600
+         BNE   INVPARM             Talk dirty and exit if not           00006700
+         MVC   ADDRHEX,2(R1)       Get PARM field in check plist        00006800
+         MVC   ADDRUNPK,2(R1)      Get PARM field for translate         00006900
+         TR    ADDRUNPK,HEXTBL     Translate PARM field to zoned        00007000
+         PACK  ADDRESS(5),ADDRUNPK(9) Pack PARM field                   00007100
+         L     R1,ADDRESS          Address storage pointed to by PARM   00007200
+         CLC   0(LPWUPCMD,R1),STRTPWUP Parmlist from ICHSFR00 found?    00007300
+         BNE   INVPARM             Talk dirty and exit if not           00007400
+         MVC   PWUPUSER(8),PWUPUSER-STRTPWUP(R1) get user               00007500
+         MVC   PWUPPSWD(8),PWUPPSWD-STRTPWUP(R1) get new password       00007600
+         XC    0(LPWUP,R1),0(R1)   Clear ICHSFR00 parmlist storage      00007700
+         FREEMAIN RU,LV=LPWUP,A=ADDRESS,SP=227 Free parmlist storage    00007800
+         ENQ    (SECURITY,USERS,E,,SYSTEM),RET=HAVE serialization       00007900
+         OPEN  (QUEUE,(EXTEND))    Open password change queue           00008000
+         PUT   QUEUE,PWUP          Write entry                          00008100
+         CLOSE (QUEUE)             Close password change queue          00008200
+         DEQ   (SECURITY,USERS,,SYSTEM) Release ENQ                     00008300
+         MVC   SUCCESS+38(8),PWUPUSER Move user into success message    00008400
+         WTO   MF=(E,SUCCESS)      Tell operator                        00008500
+         B     RETURN                                                   00008600
+INVPARM  WTO   'RAKF006W invalid password update request ignored'       00008700
+         B     RETURN1             Return, but do not link CJYRUIDS     00008800
+*                                                                       00008900
+*        Link to CJYRUIDS (RAKFUSER) to update the USERS table in core  00009000
+*        and return.                                                    00009100
+*                                                                       00009200
+RETURN   MODESET MODE=PROB,KEY=NZERO return to problem state            00009300
+         LA    R1,USERPRM          Parameter for CJYRUIDS               00009400
+         LINK  EP=CJYRUIDS         Update USERS table in core           00009500
+RETURN1  L     R13,SAVEAREA+4      Get caller's savearea                00009600
+         RETURN (14,12),,RC=0      Return                               00009700
+*                                                                       00009800
+* data area                                                             00009900
+*                                                                       00010000
+STRTPWUP DC    AL2(LPWUPCMD)       Parameter list that must have been.. 00010100
+         DC    X'0000'               .. used to start this RAKFPWUP ..  00010200
+         DC    C'S RAKFPWUP,PARM=''' .. run. This is used to perform .. 00010300
+ADDRHEX  DS    CL8                   .. a validity check of the CSA ..  00010400
+         DC    C''''                 .. storage addressed through ..    00010500
+LPWUPCMD EQU   *-STRTPWUP            .. the PARM field                  00010600
+PWUP     DS    0C                  Changes queue record                 00010700
+PWUPUSER DC    CL8' '              Userid                               00010800
+         DC    C' '                Filler                               00010900
+PWUPPSWD DC    CL8' '              New password                         00011000
+         DC    C' '                Filler                               00011100
+CHGLRECL EQU   *-PWUP              Record length of changes queue       00011200
+LPWUP    EQU   *-STRTPWUP          Total length of CSA area             00011300
+ADDRUNPK DS    CL8                 Unpacked address                     00011400
+         DC    X'C0'               sign and dummy digit                 00011500
+ADDRESS  DS    F                   packed address                       00011600
+         DS    X                   dummy digit and sign after pack      00011700
+SECURITY DC    CL8'CJYRCVT'        Resource name for ENQ                00011800
+USERS    DC    CL8'CJYUSRS'        Resource name for ENQ                00011900
+QUEUE    DCB   DDNAME=RAKFPWUP,MACRF=PM,DSORG=PS password change queue  00012000
+SUCCESS  WTO   'RAKF007I password update for user UUUUUUUU queued',MF=L 00012100
+USERP    DC    H'0'                For CJYRUIDS                         00012200
+USERPRM  DC    A(USERP)                                                 00012300
+*                 0 1 2 3 4 5 6 7 8 9 A B C D E F                       00012400
+HEXTBL   DC    X'00000000000000000000000000000000' 0                    00012500
+         DC    X'00000000000000000000000000000000' 1                    00012600
+         DC    X'00000000000000000000000000000000' 2                    00012700
+         DC    X'00000000000000000000000000000000' 3                    00012800
+         DC    X'00000000000000000000000000000000' 4                    00012900
+         DC    X'00000000000000000000000000000000' 5 translate table    00013000
+         DC    X'00000000000000000000000000000000' 6 to convert CSA     00013100
+         DC    X'00000000000000000000000000000000' 7 address from PARM  00013200
+         DC    X'00000000000000000000000000000000' 8 field to zoned     00013300
+         DC    X'00000000000000000000000000000000' 9 format             00013400
+         DC    X'00000000000000000000000000000000' A                    00013500
+         DC    X'00000000000000000000000000000000' B                    00013600
+         DC    X'00FAFBFCFDFEFF000000000000000000' C                    00013700
+         DC    X'00000000000000000000000000000000' D                    00013800
+         DC    X'00000000000000000000000000000000' E                    00013900
+         DC    X'F0F1F2F3F4F5F6F7F8F9000000000000' F                    00014000
+*                                                                       00014100
+* Equates                                                               00014200
+*                                                                       00014300
+         YREGS                     Register equates                     00014400
+         END   CJYRPWUP            End of program                       00014500
