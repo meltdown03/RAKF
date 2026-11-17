@@ -5,7 +5,7 @@
 //             REGION=8192K,                                            00000500
 //             MSGLEVEL=(1,1)                                           00000600
 //* ------------------------------------------------------------------* 00000700
-//* Remove RAKF 2.0.0                                                 * 00000800
+//* Remove RAKF 2.1.0                                                 * 00000800
 //*                                                                   * 00000900
 //*   /\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/     * 00001000
 //*   Danger!!! Danger!!! Danger!!! Danger!!! Danger!!! Danger!!!     * 00001100
@@ -113,7 +113,7 @@
   DEL  MAC(CJYUCBLK) .                                                  00011300
   DEL  MAC(IEZCTGFL) .                                                  00011400
   DEL  MAC(INITPWUP) .                                                  00011500
-  DEL  MAC(INITSHAD) .                                                  00011600
+  DEL  MAC(UPDTBLS)  .                                                  00011600
   DEL  MAC(INITTBLS) .                                                  00011700
   DEL  MAC(YREGS)    .                                                  00011800
   DEL  MAC(RAKF)     .                                                  00011900
@@ -172,7 +172,7 @@
   DEL  MAC(CJYUCBLK) .                                                  00017200
   DEL  MAC(IEZCTGFL) .                                                  00017300
   DEL  MAC(INITPWUP) .                                                  00017400
-  DEL  MAC(INITSHAD) .                                                  00017500
+  DEL  MAC(UPDTBLS)  .                                                  00017500
   DEL  MAC(INITTBLS) .                                                  00017600
   DEL  MAC(YREGS)    .                                                  00017700
   DEL  MAC(RAKF)     .                                                  00017800
