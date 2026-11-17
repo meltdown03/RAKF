@@ -45,10 +45,6 @@ if args.userid and len(args.userid) > 7:
     sys.exit('generate_release.py: --userid is longer than 7 characters')
 if args.password and len(args.password) > 8:
     sys.exit('generate_release.py: --password is longer than 8 characters')
-if args.upgrade:
-    sys.exit('generate_release.py: --upgrade is unavailable until existing '
-             'shadow credentials can be migrated safely')
-
 running_folder = os.path.dirname(os.path.abspath(__file__))
 
 # ------------------------------------------------------------------ #
@@ -668,8 +664,6 @@ if args.users_recovery:
         recovery_cards = build_user_cards(f.read())
     sys.stderr.write("[gen] WARNING: recovery replaces the entire USERS member "
                      "and resets passwords from {}.\n".format(users_path))
-    sys.stderr.write("[gen] WARNING: current RAKF programs still expect the "
-                     "shadow dataset; do not run this job until they are updated.\n")
     sys.stderr.write("[gen] WARNING: the generated deck and JES input spool "
                      "contain password hashes; protect them accordingly.\n")
     emit_users_recovery(recovery_cards)
