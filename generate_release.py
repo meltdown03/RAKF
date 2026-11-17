@@ -3,8 +3,8 @@
 # Generate the RAKF install job stream.
 #
 # The RAKF core (HLASM modules, procs, macros) ships as SMP source that MVS
-# assembles/link-edits on-target. The password shadow records are raw binary
-# embedded after a `DD DATA,DLM=` card.
+# assembles/link-edits on-target. USERS records contain raw binary password
+# hashes embedded after a `DD DATA,DLM=` card.
 #
 # Because the file contains raw binary, submit it through the EBCDIC
 # pass-through reader (device 001A / port 3506), NOT the ASCII reader 3505:
@@ -24,20 +24,17 @@ arg_parser.add_argument('--helplib', default="SYS2.HELP",
                         help="Target help library for the ADDUSER/ALTUSER HELP members")
 arg_parser.add_argument('--codepage', default="cp037",
                         help="EBCDIC codepage for card images (cp037 or cp1047)")
-arg_parser.add_argument('--shadow-recovery', action='store_true',
-                        help="Emit only a standalone EBCDIC job that recreates and "
-                             "populates the RAKF password shadow dataset from users.txt")
-arg_parser.add_argument('--shadow-dsn', default="SYS1.SECURE.SHADOW",
-                        help="Shadow dataset name for --shadow-recovery")
-arg_parser.add_argument('--shadow-volume', default=None,
-                        help="Optional VOL=SER for a newly recreated shadow dataset")
+arg_parser.add_argument('--shadow-recovery', '--users-recovery',
+                        dest='users_recovery', action='store_true',
+                        help="Emit a standalone job replacing SYS1.SECURE.CNTL(USERS) "
+                             "with users and password hashes from users.txt")
 arg_parser.add_argument('--run-rakfuser', action='store_true',
-                        help="After shadow recovery, EXEC the installed RAKFUSER procedure "
+                        help="After USERS recovery, EXEC the installed RAKFUSER procedure "
                              "to reload the in-core user table (otherwise IPL/reload later)")
 arg_parser.add_argument('--upgrade', action='store_true',
                         help="Generate an in-place RAKF upgrade job instead of a fresh install.")
 arg_parser.add_argument('--userid', default=None,
-                        help="Put USER= on the RAKFINST and shadow-recovery job cards "
+                        help="Put USER= on the RAKFINST and recovery job cards "
                              "(1 to 7 characters)")
 arg_parser.add_argument('--password', default=None,
                         help="Put PASSWORD= on those job cards (1 to 8 characters)")
@@ -48,7 +45,6 @@ if args.userid and len(args.userid) > 7:
     sys.exit('generate_release.py: --userid is longer than 7 characters')
 if args.password and len(args.password) > 8:
     sys.exit('generate_release.py: --password is longer than 8 characters')
-
 running_folder = os.path.dirname(os.path.abspath(__file__))
 
 # ------------------------------------------------------------------ #
@@ -415,97 +411,61 @@ def emit_smp_tail(filename):
 
 
 # ------------------------------------------------------------------ #
-#  Initial credentials: blank the USERS passwords, hash into a shadow #
+#  Initial credentials: blank plaintext and build password hashes     #
 # ------------------------------------------------------------------ #
 #  Field offsets in a USERS record (0-based), per RAKFUSER's DSECT:    #
-#    0-7 userid   8 dflt-flag   9-16 group   17 rsvd   18-25 password  #
-def build_credentials(users_text):
-    """From the raw users file produce (1) a USERS table with the password
-    column blanked and (2) the raw shadow-file bytes: for each distinct userid,
-    userid(8) + 8-byte salt + SHA-256(salt || UPPER(password)) — the exact
-    layout RAKFPWH/ICHSFR00 verify against (validated byte-for-byte)."""
-    blanked, shadow, seen = [], bytearray(), set()
-    for line in users_text.split('\n'):
-        s = line.strip()
-        # Blank and comment lines are DROPPED, not preserved. What this
-        # builds is not a text file -- it is spliced into the USERS member
-        # and read positionally by RAKFUSER, which rejects any record whose
-        # userid field is blank:
-        #     RAKFUIDS2  INPUT DATA INVALID OR OUT OF SEQ.
-        #     RAKFUIDSX  ** PROGRAM TERMINATED **
-        # and then terminates, leaving the system with no users at all. A
-        # comment line has no group or password field either, so it is just
-        # as invalid as a blank one. Note split('\n') yields a trailing empty
-        # element for any file ending in a newline, so keeping blanks breaks
-        # every normally-terminated users file (this repo's own users.txt has
-        # no trailing newline, which is why it never showed up here).
-        if not s or s.startswith('*'):
+#    0-7 userid   8 record type   9-16 group   17 flag   18-25 password #
+def build_user_cards(users_text):
+    """Build FB80 USERS cards with salt and hash on type-1 records only."""
+    records = []
+    primary = set()
+    userids = set()
+    for number, line in enumerate(users_text.splitlines(), 1):
+        if not line.strip() or line.lstrip().startswith('*'):
             continue
-        p = line.ljust(80)
-        userid = p[0:8].rstrip()
-        password = p[18:26].strip()
-        blanked.append((p[:18] + ' ' * 8 + p[26:]).rstrip())   # cols 19-26 blanked
-        if userid and password and userid not in seen:
-            seen.add(userid)
-            salt = os.urandom(8)
-            digest = hashlib.sha256(salt + password.upper().encode('cp037')).digest()
-            shadow += userid.ljust(8).encode('cp037') + salt + digest   # 48 bytes
-    return '\n'.join(blanked), bytes(shadow)
-
-
-# These continue the RAKFINST job rather than starting one of their own.
-# They MUST: SYS1.SECURE.SHADOW is allocated by RAKFCUST's ALLOC step, which
-# is part of RAKFINST, and this references it DISP=SHR. As a separate job it
-# raced -- JES2 is genned with two initiators on class A (I1 START,CLASS=A
-# and I2 START,CLASS=BA), so it started on INIT 2 while RAKFINST was still
-# running on INIT 1 and failed before the dataset existed:
-#     IEF453I RAKFSHAD - JOB FAILED - JCL ERROR
-#     IEFACTRT SHADLOAD/IEBGENER/.../NOXEC/RAKFSHAD
-# leaving the shadow file empty, and every password on the system unusable.
-# Steps within one job are serialized, so ordering is guaranteed -- and it
-# brings these under the caller's existing check_maxcc('RAKFINST').
-SHADOW_LOAD = """//*******************************************************************
-//* Populate SYS1.SECURE.SHADOW with the salted SHA-256 password
-//* hashes (computed at release-generation time).  The 48-byte
-//* records are shipped padded to 80-byte cards through the EBCDIC
-//* reader; IEBGENER trims each back to LRECL 48 on the way in.
-//*******************************************************************
-//SHADLOAD EXEC PGM=IEBGENER
-//SYSPRINT DD SYSOUT=*
-//SYSUT2   DD DSN={dsn},DISP=SHR
-//SYSUT1   DD DATA,DLM='{dlm}'"""
-
-SHADOW_LOAD_SYSIN = """//SYSIN    DD *
-  GENERATE MAXFLDS=1
-  RECORD FIELD=(48,1,,1)"""
-
-
-def emit_shadow_load(shadow, dsn="SYS1.SECURE.SHADOW"):
-    """Emit a job that loads the (host-computed) shadow records into
-    SYS1.SECURE.SHADOW.  The FB48 records don't align to 80-byte cards, so each
-    is padded to 80 for transport and IEBGENER's RECORD FIELD trims it to 48."""
-    if not shadow:
-        sys.stderr.write("[gen] no passwords in the users file; skipping shadow load\n")
-        return
-    cards = bytearray()
-    for i in range(0, len(shadow), 48):
-        cards += shadow[i:i+48] + b'\x00' * 32       # 48 data + 32 filler = one card
-    dlm = pick_dlm(bytes(cards))
-    sys.stderr.write("[gen] shadow: {} user(s), {} bytes (DLM={})\n"
-                     .format(len(shadow) // 48, len(shadow), dlm))
-    (emit_guarded_text if args.upgrade else emit_text)(
-        SHADOW_LOAD.format(dlm=dlm, dsn=dsn))
-    OUT.extend(cards)          # raw binary, 80-byte cards
-    emit(dlm)
-    (emit_guarded_text if args.upgrade else emit_text)(SHADOW_LOAD_SYSIN)
+        if len(line) > 80:
+            sys.exit('generate_release.py: USERS line {} exceeds 80 columns'
+                     .format(number))
+        record = line.ljust(80)
+        userid, kind = record[:8].strip(), record[8]
+        if not userid or kind not in ('1', '2'):
+            sys.exit('generate_release.py: USERS line {} needs a userid and '
+                     'record type 1 or 2 in column 9'.format(number))
+        userids.add(userid)
+        password = record[18:26].strip()
+        if kind == '1':
+            if userid in primary:
+                sys.exit('generate_release.py: duplicate type-1 USERS record '
+                         'for {}'.format(userid))
+            primary.add(userid)
+            if password:
+                salt = os.urandom(8)
+                digest = hashlib.sha256(
+                    salt + password.upper().encode('cp037')).digest()
+                credential = salt + digest
+            else:
+                credential = bytes(40)
+        else:
+            credential = ' '.encode(CP) * 40
+        prefix = record[:18] + ' ' * 8 + record[26:31]
+        card = prefix.encode(CP) + credential + record[71:].encode(CP)
+        if len(card) != 80:
+            sys.exit('generate_release.py: USERS line {} is not an FB80 card'
+                     .format(number))
+        records.append(card)
+    missing = userids - primary
+    if missing:
+        sys.exit('generate_release.py: missing type-1 USERS record for {}'
+                 .format(', '.join(sorted(missing))))
+    if not records:
+        sys.exit('generate_release.py: no USERS records found')
+    return b''.join(sorted(records))
 
 
 def emit_rakfcust(filename, inserts):
     """Emit RAKFCUST.jcl, splicing USERS/PROFILES and handling upgrades.
 
-    On an upgrade SYS1.SECURE.PWUP and SYS1.SECURE.CNTL already exist, so the
-    ALLOC step references them DISP=SHR instead of attempting DISP=NEW. SHADOW
-    is still allocated by the original RAKFCUST JCL after a guarded delete.
+    USERS cards are binary; use DD DATA and a collision-free delimiter.
     """
     emit("//*" + "*" * 66)
     emit("//* {}".format("/".join(filename.split("/")[-2:])))
@@ -516,6 +476,7 @@ def emit_rakfcust(filename, inserts):
     skipping = False          # dropping an old placeholder body up to its /*
     skip_dd_cont = False      # dropping allocation continuations for reused DSNs
     n = 0                     # number of placeholders filled so far
+    users_dlm = pick_dlm(inserts[0])
     for line_index, l in enumerate(lines):
         if l.strip() == "//" or not l.strip():
             continue
@@ -527,16 +488,20 @@ def emit_rakfcust(filename, inserts):
         if skipping:
             if l.strip() == "/*":
                 skipping = False
-                emit(l.rstrip())
+                emit(users_dlm if n == 1 else l.rstrip())
+            continue
+
+        if skip_dd_cont:
+            if l.startswith('//') and len(l) > 2 and l[2].isspace():
+                continue
+            skip_dd_cont = False
+        if l.startswith('//SHADOW') and 'SYS1.SECURE.SHADOW' in l:
+            skip_dd_cont = True
             continue
 
         # In upgrade mode these two datasets came from the previous RAKF
         # installation. Keep them and suppress the UNIT/DCB/SPACE continuation
         # cards belonging to their original DISP=(,CATLG) allocation DDs.
-        if args.upgrade and skip_dd_cont:
-            if l.startswith('//') and len(l) > 2 and l[2].isspace():
-                continue
-            skip_dd_cont = False
         if args.upgrade and l.startswith('//PWUP') and 'SYS1.SECURE.PWUP' in l:
             emit('//PWUP    DD DISP=SHR,DSN=SYS1.SECURE.PWUP')
             skip_dd_cont = True
@@ -544,6 +509,15 @@ def emit_rakfcust(filename, inserts):
         if args.upgrade and l.startswith('//RAKF') and 'SYS1.SECURE.CNTL' in l:
             emit('//RAKF    DD DISP=SHR,DSN=SYS1.SECURE.CNTL')
             skip_dd_cont = True
+            continue
+
+        toks = l.split()
+        if n == 0 and len(toks) >= 3 and toks[0] == "//SYSUT1" \
+                and toks[1] == "DD" and toks[2] == "*":
+            emit("//SYSUT1 DD DATA,DLM='{}'".format(users_dlm))
+            OUT.extend(inserts[0])
+            n = 1
+            skipping = True
             continue
 
         emit_jcl_line(
@@ -555,7 +529,6 @@ def emit_rakfcust(filename, inserts):
                           if _exec_line(l.rstrip()) else False,
         )
         check_step(l, filename)
-        toks = l.split()
         if n < 2 and len(toks) >= 3 and toks[0] == "//SYSUT1" \
                 and toks[1] == "DD" and toks[2] == "*":
             emit_text(inserts[n])     # splice users.txt / profiles.txt
@@ -573,8 +546,7 @@ def pick_dlm(payload):
     raise SystemExit("generate_release.py: could not find a collision-free DD DATA delimiter")
 
 
-# Also a continuation of RAKFINST, for the same reason as SHADOW_LOAD above:
-# separate jobs run on separate initiators and race the install they depend on.
+# Continue RAKFINST rather than racing the install in a separate job.
 HELP_HEADER = """//* --- TSO HELP members for the admin commands -------------------
 //HELPLOAD EXEC PGM=IEBUPDTE,PARM=NEW
 //SYSPRINT DD SYSOUT=*
@@ -648,7 +620,7 @@ def emit_help():
 
 
 # ------------------------------------------------------------------ #
-#  Standalone shadow-file recovery mode.                              #
+#  Standalone USERS recovery mode.                                    #
 # ------------------------------------------------------------------ #
 def write_output():
     """Write the accumulated EBCDIC card-image stream."""
@@ -664,52 +636,37 @@ def write_output():
                          .format(len(OUT)))
 
 
-def emit_shadow_recovery(shadow):
-    """Emit a self-contained job to recreate and populate the shadow file.
-
-    This intentionally does not touch the RAKF USERS member or any load module.
-    By default it stops after loading the dataset; use --run-rakfuser only when
-    the installed RAKFUSER procedure is known to be runnable in the current
-    system. Otherwise an IPL/reload can rebuild the in-core user table later.
-    """
-    dsn = args.shadow_dsn.upper()
-    emit("//RAKFSHAD JOB (RAKF),'RAKF SHADOW RECOVERY',CLASS=A,MSGCLASS=A,")
+def emit_users_recovery(cards):
+    """Replace the USERS member without passing binary records through REXX."""
+    dlm = pick_dlm(cards)
+    emit("//RAKFRECV JOB (RAKF),'RAKF USERS RECOVERY',CLASS=A,MSGCLASS=A,")
     jobtail = "//         MSGLEVEL=(1,1),REGION=4096K"
     if args.userid:
         jobtail += ",USER={},PASSWORD={}".format(
             args.userid.upper(), args.password.upper())
     emit(jobtail)
-    emit("//* Recreate the RAKF V2 password shadow file")
-    emit("//DELETE   EXEC PGM=IDCAMS")
+    emit("//* Replace USERS with records and passwords from the input file")
+    emit("//RECOVER  EXEC PGM=IEBGENER")
     emit("//SYSPRINT DD SYSOUT=*")
-    emit("//SYSIN    DD *")
-    emit("  DELETE {} PURGE".format(dsn))
-    emit("  SET MAXCC=0")
-    emit("/*")
-    emit("//ALLOC    EXEC PGM=IEFBR14")
-    emit("//SHADOW   DD DSN={},DISP=(NEW,CATLG,DELETE),".format(dsn))
-    emit("//             UNIT=SYSDA,")
-    if args.shadow_volume:
-        emit("//             VOL=SER={},".format(args.shadow_volume.upper()))
-    emit("//             SPACE=(TRK,(1,1)),")
-    emit("//             DCB=(DSORG=PS,RECFM=FB,LRECL=48,BLKSIZE=19008)")
-    emit_shadow_load(shadow, dsn=dsn)
+    emit("//SYSIN    DD DUMMY")
+    emit("//SYSUT2   DD DSN=SYS1.SECURE.CNTL(USERS),DISP=OLD")
+    emit("//SYSUT1   DD DATA,DLM='{}'".format(dlm))
+    OUT.extend(cards)
+    emit(dlm)
     if args.run_rakfuser:
-        emit("//* Reload the in-core RAKF user table from USERS + SHADOW")
-        emit("//RELOAD   EXEC RAKFUSER")
+        emit("//* Reload only after successful recovery")
+        emit("//RELOAD   EXEC RAKFUSER,COND=(0,NE,RECOVER)")
 
 
-if args.shadow_recovery:
+if args.users_recovery:
     users_path = _data_file(args.users, 'users.txt')
     with open(users_path) as f:
-        recovery_users = f.read()
-    _, recovery_shadow = build_credentials(recovery_users)
-    if not recovery_shadow:
-        sys.exit("generate_release.py: no userid/password records found in {}"
-                 .format(users_path))
-    sys.stderr.write("[gen] shadow recovery from {}: {} user(s)\n"
-                     .format(users_path, len(recovery_shadow) // 48))
-    emit_shadow_recovery(recovery_shadow)
+        recovery_cards = build_user_cards(f.read())
+    sys.stderr.write("[gen] WARNING: recovery replaces the entire USERS member "
+                     "and resets passwords from {}.\n".format(users_path))
+    sys.stderr.write("[gen] WARNING: the generated deck and JES input spool "
+                     "contain password hashes; protect them accordingly.\n")
+    emit_users_recovery(recovery_cards)
     write_output()
     sys.exit(0)
 
@@ -757,25 +714,12 @@ emit_smp_tail(running_folder + "/TEMPLATES/02_smp4.template")
 
 install = []
 
-# These two USERMODs are part of the normal/fresh RAKF installation, but the
-# old TRKF126 installation already has them.  Do not RECEIVE/APPLY them again
-# during an upgrade; among other things, ZPY0001's PRE(ZJW0003) is already
-# satisfied by the existing ZJW0003.
-# Usermod ZUM0001 adds the TSO command processors LISTUSER, LU and LISTP
-# to the TSO authorized command table IKJEFTE2.
+# RAK0001 is already installed on the supported upgrade path.
 if not args.upgrade:
-    install.extend([
-        'USERMODS/RAK0001.jcl',
-        'USERMODS/ZJW0003.jcl',
-    ])
+    install.append('USERMODS/RAK0001.jcl')
 
 install.extend([
-    # ZJW0003 MACUPDs SGIEE0MS to add the //RAKFSHAD DD to MSTJCL00, which is
-    # how RAKFUSER reaches SYS1.SECURE.SHADOW at IPL. 
-    # ZJW0003 already installed with the previous RAKF release.
-    # Without it the OPEN fails with 'IEC130I RAKFSHAD DD STATEMENT MISSING',
-    # no hashes load, and -- since build_credentials() blanks the USERS
-    # password column -- every credential on the system becomes unverifiable.
+    'USERMODS/ZJW0003.jcl',
     'USERMODS/JLM0003.jcl',
     'TOOLS/RAKFCUST.jcl',
     'AUX/VTOC/vtoc.jcl',
@@ -784,38 +728,17 @@ install.extend([
     'TOOLS/VTOCSRAC.jcl',
 ])
 
-# ---- process the initial users: blank passwords, build the shadow --
+# ---- process the initial users: blank passwords and embed credentials --
 _users_raw = open(_data_file(args.users, 'users.txt')).read()
 _profiles = open(_data_file(args.profiles, 'profiles.txt')).read().strip()
-blanked_users, shadow_bytes = build_credentials(_users_raw)
+user_cards = build_user_cards(_users_raw)
+sys.stderr.write('[gen] WARNING: the generated deck and JES input spool contain '
+                 'password hashes; protect them accordingly.\n')
 
 for jcl in install:
     path = running_folder + "/" + jcl
     if 'RAKFCUST' in jcl:
-        if args.upgrade:
-            # RAKF 1.x has no shadow file. Delete any leftover from a partial
-            # V2 attempt so RAKFCUST can allocate a clean FB48 dataset and
-            # SHADLOAD cannot leave stale trailing records on a retry.
-            emit_guarded_text("""//SHADDEL  EXEC PGM=IDCAMS
-//SYSPRINT DD SYSOUT=*
-//SYSIN    DD *
-  DELETE SYS1.SECURE.SHADOW PURGE
-  SET MAXCC=0
-/*""")
-        emit_rakfcust(path, [blanked_users, _profiles])
-        # The shadow load and the HELP install belong HERE -- after
-        # RAKFCUST's ALLOC step has created SYS1.SECURE.SHADOW, and before
-        # VSAMSRAC's RACIND and VTOCSRAC's RACINDVT steps set the RACF
-        # indicator bit on the datasets.
-        #
-        # Once a dataset is RACF-indicated, OPEN issues SVC 130 (RACHECK).
-        # RAKF supplies that SVC but does not activate until the next IPL,
-        # so within this job the SVC has no handler and the step dies:
-        #     IEF472I RAKFINST SHADLOAD - COMPLETION CODE - SYSTEM=E82
-        # Running them before the indicators are set avoids the RACHECK
-        # entirely. (They were originally trailing jobs, which also raced
-        # RACIND -- separate jobs on separate initiators, same root cause.)
-        emit_shadow_load(shadow_bytes)
+        emit_rakfcust(path, [user_cards, _profiles])
         emit_help()
     else:
         read_file(path, guard_apply=args.upgrade)
