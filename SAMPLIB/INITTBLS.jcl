@@ -18,17 +18,17 @@
 //SYSPRINT DD SYSOUT=*                                                          
 //SYSIN    DD *                                                                 
 ./ ADD NAME=USERS                                                               
-BSPPILOT STARTED *         N N                                                  
-BSPSETPF STARTED *         N N                                                  
-FTPD     STARTED *         N N                                                  
-HERC01   ADMIN   *         Y Y                                                  
-HERC01   RAKFADM           Y Y                                                  
-HERC02   ADMIN   *         N N                                                  
-HERC03   USER    *         N N                                                  
-HERC04   USER    *         N N                                                  
-HTTPD    STARTED *         N N                                                  
-IBMUSER  ADMIN   *         N N                                                  
-UFSD     STARTED *         N N                                                  
+BSPPILOT1STARTED *         N N                                                  
+BSPSETPF1STARTED *         N N                                                  
+FTPD    1STARTED *         N N                                                  
+HERC01  1ADMIN   *         Y Y                                                  
+HERC01  2RAKFADM                                                                
+HERC02  1ADMIN   *         N N                                                  
+HERC03  1USER    *         N N                                                  
+HERC04  1USER    *         N N                                                  
+HTTPD   1STARTED *         N N                                                  
+IBMUSER 1ADMIN   *         N N                                                  
+UFSD    1STARTED *         N N                                                  
 ./ ADD NAME=PROFILES                                                            
 DASDVOL *                                                   READ                
 DASDVOL *                                           ADMIN   ALTER               
