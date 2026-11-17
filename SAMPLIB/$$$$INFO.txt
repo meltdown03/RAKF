@@ -8,7 +8,9 @@
 *    adapted to MVS 3.8J: A. Philip Dickinson (Aug 2005)             *          
 *                         Phil Roberts        (Apr 2011)             *          
 *                         Juergen Winkelmann  (Apr 2011)             *          
+*                         Rob Prins           (Nov 2026)             *          
 *                                                                    *          
+*    https://github.com/mvslovers/RAKF                               *          
 **********************************************************************          
 *                                                                               
 *    Member $$$$$DOC in this library is the original documentation of           
@@ -17,8 +19,8 @@
 *    current in some aspects due to the changes introduced by RAKF to           
 *    achieve MVS 3.8j compatibility.                                            
 *                                                                               
-*    The current RAKF documentation is the "RAKF Version 2 Release 0            
-*    Modifaction 0 User's Guide" which is available in two formats:             
+*    The current RAKF documentation is the "RAKF Users Guide",                  
+*    which is available in two formats:                                         
 *                                                                               
 *    o Microsoft Word 2010 .docx:        The source document ("original         
 *                                        copy") and base for further            
