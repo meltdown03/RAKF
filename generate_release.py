@@ -31,8 +31,6 @@ arg_parser.add_argument('--shadow-recovery', '--users-recovery',
 arg_parser.add_argument('--run-rakfuser', action='store_true',
                         help="After USERS recovery, EXEC the installed RAKFUSER procedure "
                              "to reload the in-core user table (otherwise IPL/reload later)")
-arg_parser.add_argument('--upgrade', action='store_true',
-                        help="Generate an in-place RAKF upgrade job instead of a fresh install.")
 arg_parser.add_argument('--userid', default=None,
                         help="Put USER= on the RAKFINST and recovery job cards "
                              "(1 to 7 characters)")
@@ -90,144 +88,6 @@ def _exec_line(line):
     return bool(body) and not body[0].isspace() and ' EXEC ' in line
 
 
-def _exec_continuation(line):
-    """True for a blank-name JCL continuation card such as // PARM=... ."""
-    if not line.startswith('//') or line.startswith('//*'):
-        return False
-    body = line[2:]
-    return bool(body) and body[0].isspace()
-
-
-def _next_exec_continuation(lines, index):
-    """Return True when the EXEC at index is followed by an active continuation.
-
-    JCL comments and blank cards may occur between continuation cards, so ignore
-    those while looking ahead. A named JCL statement ends the EXEC statement.
-    """
-    for j in range(index + 1, len(lines)):
-        r = lines[j].rstrip()
-        if not r or r.startswith('//*'):
-            continue
-        return _exec_continuation(r)
-    return False
-
-
-def _exec_has_cond(lines, index):
-    """Check the EXEC card and its active continuation cards for COND=."""
-    r = lines[index].rstrip()
-    if 'COND=' in r.upper():
-        return True
-
-    for j in range(index + 1, len(lines)):
-        s = lines[j].rstrip()
-        if not s or s.startswith('//*'):
-            continue
-        if not _exec_continuation(s):
-            break
-        if 'COND=' in s.upper():
-            return True
-        # A continuation without a trailing comma completes the EXEC.
-        if not s.endswith(','):
-            break
-    return False
-
-
-def _split_exec_for_guard(line):
-    """Make a noncontinued EXEC continuable without using column 72.
-
-    MVS JCL's statement field ends at column 71.  If an EXEC already occupies
-    all 71 columns, simply appending ',' puts the comma in column 72 and JES
-    reports IEF618I.  Move the last top-level EXEC operand to a continuation
-    card instead.
-
-    Example:
-      //ASMCDSCB EXEC PGM=IFOX00,REGION=2048K,PARM=(...)
-    becomes:
-      //ASMCDSCB EXEC PGM=IFOX00,REGION=2048K,
-      //         PARM=(...),
-    """
-    line = line.rstrip()
-    if line.endswith(','):
-        return [line]
-
-    # If there is room for a comma in the actual JCL statement field, use it.
-    # Column 71 is the last usable character, so the existing line may be at
-    # most 70 columns before the comma is appended.
-    if len(line) <= 70:
-        return [line + ',']
-
-    # Find top-level commas (ignore commas inside quotes/parentheses) and move
-    # the shortest possible final operand to a continuation card.
-    comma_positions = []
-    depth = 0
-    quote = None
-    for i, ch in enumerate(line):
-        if quote:
-            if ch == quote:
-                quote = None
-            continue
-        if ch in ("'", '"'):
-            quote = ch
-        elif ch == '(':
-            depth += 1
-        elif ch == ')':
-            if depth:
-                depth -= 1
-        elif ch == ',' and depth == 0:
-            comma_positions.append(i)
-
-    prefix = '//         '
-    for pos in reversed(comma_positions):
-        head = line[:pos + 1]
-        tail = line[pos + 1:].strip()
-        continuation = prefix + tail + ','
-        if len(head) <= 71 and len(continuation) <= 71:
-            return [head, continuation]
-
-    sys.exit('generate_release.py: cannot safely add APPLY guard to EXEC '
-             'within JCL columns 1-71:\n  {}'.format(line))
-
-
-def emit_jcl_line(line, guard_apply=False, exec_continues=False,
-                  existing_cond=False):
-    """Emit one JCL line, optionally bypassing the step if core APPLY failed.
-
-    When the original EXEC already has continuation cards, the inserted COND
-    must itself end in a comma.  When there is no following continuation, COND
-    closes the EXEC statement.  Full-width EXEC cards are split first so no
-    continuation comma is ever placed in column 72.
-    """
-    line = line.rstrip()
-    if (guard_apply and args.upgrade and _exec_line(line)
-            and not existing_cond):
-        if line.endswith(','):
-            emit(line)
-        else:
-            for part in _split_exec_for_guard(line):
-                emit(part)
-        suffix = ',' if exec_continues else ''
-        emit('//         COND={}{}'.format(APPLY_GUARD, suffix))
-    else:
-        emit(line)
-
-
-def emit_guarded_lines(lines):
-    """Emit JCL lines with an APPLY guard added safely to complete EXEC statements."""
-    for i, l in enumerate(lines):
-        r = l.rstrip()
-        emit_jcl_line(
-            r,
-            guard_apply=True,
-            exec_continues=_next_exec_continuation(lines, i) if _exec_line(r) else False,
-            existing_cond=_exec_has_cond(lines, i) if _exec_line(r) else False,
-        )
-
-
-def emit_guarded_text(text):
-    """Emit a post-APPLY JCL block with the upgrade APPLY guard on each step."""
-    emit_guarded_lines(text.split('\n'))
-
-
 steps = []
 
 
@@ -241,7 +101,7 @@ def check_step(line, jcl_filename):
             raise ValueError("Duplicate Step Name {} (from {}) Already exists".format(step_name, jcl_filename))
 
 
-def read_file(filename, guard_apply=False):
+def read_file(filename):
     emit("//*" + "*" * 66)
     emit("//* {}".format("/".join(filename.split("/")[-2:])))
     emit("//*" + "*" * 66)
@@ -262,11 +122,8 @@ def read_file(filename, guard_apply=False):
             continue
         lines.append(l.rstrip())
 
-    if guard_apply and args.upgrade:
-        emit_guarded_lines(lines)
-    else:
-        for l in lines:
-            emit(l)
+    for l in lines:
+        emit(l)
 
     for l in lines:
         check_step(l, filename)
@@ -316,51 +173,47 @@ def _with_job_credentials(lines):
 
 
 def emit_header(filename):
-    """Emit 01_header.template with the fixes needed by an upgrade.
+    """Emit 01_header.template with the required SMP fixes.
 
     RESETRC lets the ACDS UCLIN run even when harmless CDS deletes report RC 8.
-    During an upgrade ICHSFR00 must remain in LPALIB because SMP can use the
-    existing LMOD as link-edit input while changing functional ownership.
-
     ++VER is emitted as written.  DELETE(TRKF120,TRKF126) already covers
     an upgrade from RAKF 1.2.0 or 1.2.6, so the generator does not rewrite it.
     """
     with open(filename) as f:
         lines = _with_job_credentials(f.readlines())
 
-    # The V2 target/distribution libraries named by the LIBS step are release
-    # work libraries.  On an upgrade/retry they may already exist from an
-    # earlier attempt.  Since LIBS allocates them NEW, that otherwise ends in:
+    # The target/distribution libraries named by the LIBS step are release
+    # work libraries. They may already exist from an earlier install attempt.
+    # Since LIBS allocates them NEW, that otherwise ends in:
     #   IEF253I ... LIBS ASAMPLIB - DUPLICATE NAME ON DIRECT ACCESS VOLUME
     # Recreate them from scratch so a retry cannot reuse stale V2 members.
-    upgrade_lib_dsns = []
-    if args.upgrade:
-        in_libs = False
-        for raw in lines:
-            r = raw.rstrip()
-            if _exec_line(r):
-                if r.startswith('//LIBS '):
-                    in_libs = True
-                    continue
-                if in_libs:
-                    break
-            if in_libs and 'DSN=' in r.upper():
-                dsn = r.upper().split('DSN=', 1)[1].split(',', 1)[0].strip()
-                if dsn and dsn not in upgrade_lib_dsns:
-                    upgrade_lib_dsns.append(dsn)
+    release_lib_dsns = []
+    in_libs = False
+    for raw in lines:
+        r = raw.rstrip()
+        if _exec_line(r):
+            if r.startswith('//LIBS '):
+                in_libs = True
+                continue
+            if in_libs:
+                break
+        if in_libs and 'DSN=' in r.upper():
+            dsn = r.upper().split('DSN=', 1)[1].split(',', 1)[0].strip()
+            if dsn and dsn not in release_lib_dsns:
+                release_lib_dsns.append(dsn)
 
     last_control = ''
     cleanup_emitted = False
     for l in lines:
         stripped = l.strip()
 
-        if (args.upgrade and not cleanup_emitted and
+        if (not cleanup_emitted and
                 l.rstrip().startswith('//LIBS ') and _exec_line(l.rstrip())):
-            emit('//* UPGRADE: remove stale V2 target/distribution libraries')
+            emit('//* Remove stale target/distribution libraries before allocation')
             emit('//CLNV2LIB EXEC PGM=IDCAMS')
             emit('//SYSPRINT DD SYSOUT=*')
             emit('//SYSIN    DD *')
-            for dsn in upgrade_lib_dsns:
+            for dsn in release_lib_dsns:
                 emit('  DELETE {} PURGE'.format(dsn))
             emit('  SET MAXCC=0')
             emit('/*')
@@ -369,12 +222,6 @@ def emit_header(filename):
 
         if stripped == 'UCLIN ACDS .' and last_control != 'RESETRC.':
             emit(' RESETRC.')
-
-        if args.upgrade and 'SCRATCH ' in l and 'MEMBER=ICHSFR00' in l:
-            # Do not emit a //* comment here: SYSIN DD * treats // in
-            # columns 1-2 as the end of in-stream data, and JES then
-            # generates a replacement SYSIN.
-            continue
 
         emit(l.rstrip())
         check_step(l, filename)
@@ -463,7 +310,7 @@ def build_user_cards(users_text):
 
 
 def emit_rakfcust(filename, inserts):
-    """Emit RAKFCUST.jcl, splicing USERS/PROFILES and handling upgrades.
+    """Emit RAKFCUST.jcl, splicing USERS/PROFILES.
 
     USERS cards are binary; use DD DATA and a collision-free delimiter.
     """
@@ -474,10 +321,11 @@ def emit_rakfcust(filename, inserts):
         lines = f.read().split('\n')
     jobcard = True
     skipping = False          # dropping an old placeholder body up to its /*
-    skip_dd_cont = False      # dropping allocation continuations for reused DSNs
+    skip_dd_cont = False      # dropping SHADOW allocation continuations
     n = 0                     # number of placeholders filled so far
+    clean_security = False
     users_dlm = pick_dlm(inserts[0])
-    for line_index, l in enumerate(lines):
+    for l in lines:
         if l.strip() == "//" or not l.strip():
             continue
         if jobcard:
@@ -499,17 +347,33 @@ def emit_rakfcust(filename, inserts):
             skip_dd_cont = True
             continue
 
-        # In upgrade mode these two datasets came from the previous RAKF
-        # installation. Keep them and suppress the UNIT/DCB/SPACE continuation
-        # cards belonging to their original DISP=(,CATLG) allocation DDs.
-        if args.upgrade and l.startswith('//PWUP') and 'SYS1.SECURE.PWUP' in l:
-            emit('//PWUP    DD DISP=SHR,DSN=SYS1.SECURE.PWUP')
-            skip_dd_cont = True
-            continue
-        if args.upgrade and l.startswith('//RAKF') and 'SYS1.SECURE.CNTL' in l:
-            emit('//RAKF    DD DISP=SHR,DSN=SYS1.SECURE.CNTL')
-            skip_dd_cont = True
-            continue
+        if l.startswith('//ALLOC ') and _exec_line(l):
+            emit('//* Delete existing security datasets before a fresh install')
+            emit('//CLNSEC  EXEC PGM=IDCAMS')
+            emit('//SYSPRINT DD SYSOUT=*')
+            emit('//SYSIN    DD *')
+            emit(' LISTCAT ENTRIES(SYS1.SECURE.PWUP)')
+            emit(' IF LASTCC = 0 THEN -')
+            emit('   DELETE SYS1.SECURE.PWUP PURGE')
+            emit(' ELSE -')
+            emit('   IF LASTCC = 4 THEN SET MAXCC = 0')
+            emit(' IF MAXCC = 0 THEN DO')
+            emit('   LISTCAT ENTRIES(SYS1.SECURE.CNTL)')
+            emit('   IF LASTCC = 0 THEN -')
+            emit('     DELETE SYS1.SECURE.CNTL PURGE')
+            emit('   ELSE -')
+            emit('     IF LASTCC = 4 THEN SET MAXCC = 0')
+            emit(' END')
+            emit('/*')
+            check_step('//CLNSEC  EXEC PGM=IDCAMS', filename)
+            clean_security = True
+
+        if clean_security and _exec_line(l):
+            if l.startswith('//USERCOPY '):
+                l = l.replace('COND=(0,NE,RAKFCNTL)',
+                              'COND=((0,NE,RAKFCNTL),(0,NE,CLNSEC))')
+            else:
+                l += ',COND=(0,NE,CLNSEC)'
 
         toks = l.split()
         if n == 0 and len(toks) >= 3 and toks[0] == "//SYSUT1" \
@@ -520,14 +384,7 @@ def emit_rakfcust(filename, inserts):
             skipping = True
             continue
 
-        emit_jcl_line(
-            l,
-            guard_apply=True,
-            exec_continues=_next_exec_continuation(lines, line_index)
-                           if _exec_line(l.rstrip()) else False,
-            existing_cond=_exec_has_cond(lines, line_index)
-                          if _exec_line(l.rstrip()) else False,
-        )
+        emit(l)
         check_step(l, filename)
         if n < 2 and len(toks) >= 3 and toks[0] == "//SYSUT1" \
                 and toks[1] == "DD" and toks[2] == "*":
@@ -602,8 +459,7 @@ def emit_help():
         aliases = aliases_from_help_member(os.path.join(help_dir, m))
         listed.append("/".join([m] + aliases) if aliases else m)
     sys.stderr.write("[gen] help members: {}\n".format(", ".join(listed)))
-    (emit_guarded_text if args.upgrade else emit_text)(
-        HELP_HEADER.format(helplib=args.helplib))
+    emit_text(HELP_HEADER.format(helplib=args.helplib))
     for m in members:
         path = os.path.join(help_dir, m)
         if not help_member_has_add(path):
@@ -712,13 +568,8 @@ for folder in folders:
 
 emit_smp_tail(running_folder + "/TEMPLATES/02_smp4.template")
 
-install = []
-
-# RAK0001 is already installed on the supported upgrade path.
-if not args.upgrade:
-    install.append('USERMODS/RAK0001.jcl')
-
-install.extend([
+install = [
+    'USERMODS/RAK0001.jcl',
     'USERMODS/ZJW0003.jcl',
     'USERMODS/JLM0003.jcl',
     'TOOLS/RAKFCUST.jcl',
@@ -726,7 +577,7 @@ install.extend([
     'AUX/CDSCB.jcl',
     'TOOLS/VSAMSRAC.jcl',
     'TOOLS/VTOCSRAC.jcl',
-])
+]
 
 # ---- process the initial users: blank passwords and embed credentials --
 _users_raw = open(_data_file(args.users, 'users.txt')).read()
@@ -734,6 +585,8 @@ _profiles = open(_data_file(args.profiles, 'profiles.txt')).read().strip()
 user_cards = build_user_cards(_users_raw)
 sys.stderr.write('[gen] WARNING: the generated deck and JES input spool contain '
                  'password hashes; protect them accordingly.\n')
+sys.stderr.write('[gen] WARNING: a fresh install deletes and recreates '
+                 'SYS1.SECURE.PWUP and SYS1.SECURE.CNTL.\n')
 
 for jcl in install:
     path = running_folder + "/" + jcl
@@ -741,7 +594,7 @@ for jcl in install:
         emit_rakfcust(path, [user_cards, _profiles])
         emit_help()
     else:
-        read_file(path, guard_apply=args.upgrade)
+        read_file(path)
 
 emit("//* Steps in this job stream")
 for i in steps:
