@@ -9,7 +9,7 @@
 //* Change 'TK5CAT' in your volume requested.                         *
 //*                                                                   *
 //* This job will be generated in install_rakf.jcl and is resident    *
-//* in TRKF210.zip in the TK5 directory.                              *
+//* in TK5INST.zip, attached to the GitHub release.                   *
 //*                                                                   *         
 //* Expected return code:  Step TABLES: 00                            *         
 //* ------------------------------------------------------------------*         
