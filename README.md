@@ -141,6 +141,16 @@ cat install_rakf.jcl | ncat --send-only -w1 127.0.0.1 3506
 To install RAKF only, without usermods, auxiliary tools, users or profiles you can use
 the file `TEMPLATES/makerakf.sh` which generates the JCL to assemble and link RAKF.
 
+### Installing on MVS 3.8j Turnkey 5 (TK5)
+
+For TK5 the GitHub release carries `TK5INST.zip`. MVS 3.8j Turnkey 5 Update 6
+already contains it as data set `USERMOD.TRKF210`, and it is also
+published on www.cbttape.org as file 850.
+
+Unzip it, upload the `trkf210.xmi` file inside to MVS and RECEIVE it with
+the NJE38 `RECEIVE` command into a PDS named `USERMOD.TRKF210`. Then
+follow the installation instructions in member `$$$$READ`.
+
 ## Customization
 
 ### Adding modules LISTUSER, LU and LISTP into IKJEFTE2

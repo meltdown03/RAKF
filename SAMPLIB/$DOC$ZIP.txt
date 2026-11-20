@@ -1,7 +1,7 @@
 *--------------------------------------------------------------------------*
 *                                                                          *
 * See README.md for the Markdown version of the Users guide or the         *
-* member $DO$ZIP in TRKF210.zip file for the DOCX version and PDF          *
+* member $DOC$ZIP in TK5INST.zip (GitHub release) for the DOCX and PDF     *
 * version.                                                                 *
 *                                                                          *
 *--------------------------------------------------------------------------*
