@@ -5,7 +5,7 @@ A Security System for MVS 3.8j
 ## User’s Guide
 
 > [!IMPORTANT]
-> New for version 2.1.0 passwords are hashed and stores in the USERS member. 
+> New for version 2.1.1 passwords are hashed and stores in the USERS member. 
 > as a result adding new users requires using the TSO command ADDUSER,
 > changing requires ALTUSER, deleting requires DELUSER and listing
 > requires LISTUSER. Read the HELP/ files for more details
