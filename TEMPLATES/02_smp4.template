@@ -7,7 +7,7 @@
 /*
 //*
 //* ------------------------------------------------------------------*
-//* SMP apply of RAKF 2.1.0                                           *
+//* SMP apply of RAKF 2.1.1                                           *
 //* Expected APPLY step return code: 04 or lower                      *
 //*                                   |                               *
 //*                                    --> resulting from RC=8 in SMP *
@@ -31,7 +31,7 @@
  APPLY S(TRKF211) DIS(WRITE) .
 /*
 //* ------------------------------------------------------------------*
-//* SMP accept of RAKF 2.1.0                                          *
+//* SMP accept of RAKF 2.1.1                                          *
 //* Expected return code: 00                                          *
 //* ------------------------------------------------------------------*
 //ACCEPTR EXEC SMPAPP
