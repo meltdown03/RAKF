@@ -27,7 +27,7 @@ ADDUSER  TITLE 'Add RAKF users with encrypted passwords'                00000100
 *                      Record type 2, contains UserId. record type,   * 00002700
 *                      Group and DFLTGRP star or blank.               * 00002800
 *                                                                     * 00002900
-*        FMID          TRKF210                                        * 00003000
+*        FMID          TRKF211                                        * 00003000
 *                                                                     * 00003100
 *        Syntax:       ADDUSER userid PASSWORD(pppppppp) +            * 00003200
 *                      DFLTGRP(group) GROUP(grp1 grp2 ...) +          * 00003300
