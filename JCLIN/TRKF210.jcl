@@ -170,6 +170,12 @@
 //         DD  DISP=SHR,DSN=RAKF.MACLIB                                         
 //SYSIN    DD  DISP=SHR,DSN=RAKF.SRCLIB(ADDSD)                                  
 //SYSPUNCH DD  DISP=(OLD,PASS),DSN=&&OBJ(ADDSD)                                 
+//ASMRDEF  EXEC PGM=IFOX00,PARM=(NOOBJ,DECK)                                    
+//SYSLIB   DD  DISP=SHR,DSN=SYS1.MACLIB                                         
+//         DD  DISP=SHR,DSN=SYS1.AMODGEN                                        
+//         DD  DISP=SHR,DSN=RAKF.MACLIB                                         
+//SYSIN    DD  DISP=SHR,DSN=RAKF.SRCLIB(RDEFINE)                                
+//SYSPUNCH DD  DISP=(OLD,PASS),DSN=&&OBJ(RDEFINE)                               
 //ASMPERM  EXEC PGM=IFOX00,PARM=(NOOBJ,DECK)                                    
 //SYSLIB   DD  DISP=SHR,DSN=SYS1.MACLIB                                         
 //         DD  DISP=SHR,DSN=SYS1.AMODGEN                                        
@@ -217,9 +223,10 @@
  NAME    CONNECT(R)                                                             
  INCLUDE SYSPUNCH(ADDSD)                                                        
  ALIAS   AD                                                                     
- ALIAS   RDEFINE                                                                
+ NAME    ADDSD(R)
+ INCLUDE SYSPUNCH(RDEFINE)  
  ALIAS   RDEF                                                                   
- NAME    ADDSD(R)                                                               
+ NAME    RDEFINE(R)                                 
  INCLUDE SYSPUNCH(PERMIT)                                                       
  ALIAS   PE                                                                     
  NAME    PERMIT(R)                                                              
