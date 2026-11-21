@@ -321,9 +321,7 @@ def emit_rakfcust(filename, inserts):
         lines = f.read().split('\n')
     jobcard = True
     skipping = False          # dropping an old placeholder body up to its /*
-    skip_dd_cont = False      # dropping SHADOW allocation continuations
     n = 0                     # number of placeholders filled so far
-    clean_security = False
     users_dlm = pick_dlm(inserts[0])
     for l in lines:
         if l.strip() == "//" or not l.strip():
@@ -338,42 +336,6 @@ def emit_rakfcust(filename, inserts):
                 skipping = False
                 emit(users_dlm if n == 1 else l.rstrip())
             continue
-
-        if skip_dd_cont:
-            if l.startswith('//') and len(l) > 2 and l[2].isspace():
-                continue
-            skip_dd_cont = False
-        if l.startswith('//SHADOW') and 'SYS1.SECURE.SHADOW' in l:
-            skip_dd_cont = True
-            continue
-
-        if l.startswith('//ALLOC ') and _exec_line(l):
-            emit('//* Delete existing security datasets before a fresh install')
-            emit('//CLNSEC  EXEC PGM=IDCAMS')
-            emit('//SYSPRINT DD SYSOUT=*')
-            emit('//SYSIN    DD *')
-            emit(' LISTCAT ENTRIES(SYS1.SECURE.PWUP)')
-            emit(' IF LASTCC = 0 THEN -')
-            emit('   DELETE SYS1.SECURE.PWUP PURGE')
-            emit(' ELSE -')
-            emit('   IF LASTCC = 4 THEN SET MAXCC = 0')
-            emit(' IF MAXCC = 0 THEN DO')
-            emit('   LISTCAT ENTRIES(SYS1.SECURE.CNTL)')
-            emit('   IF LASTCC = 0 THEN -')
-            emit('     DELETE SYS1.SECURE.CNTL PURGE')
-            emit('   ELSE -')
-            emit('     IF LASTCC = 4 THEN SET MAXCC = 0')
-            emit(' END')
-            emit('/*')
-            check_step('//CLNSEC  EXEC PGM=IDCAMS', filename)
-            clean_security = True
-
-        if clean_security and _exec_line(l):
-            if l.startswith('//USERCOPY '):
-                l = l.replace('COND=(0,NE,RAKFCNTL)',
-                              'COND=((0,NE,RAKFCNTL),(0,NE,CLNSEC))')
-            else:
-                l += ',COND=(0,NE,CLNSEC)'
 
         toks = l.split()
         if n == 0 and len(toks) >= 3 and toks[0] == "//SYSUT1" \
