@@ -1,6 +1,6 @@
 //TRKF210  JOB 1,'RAKF 2.1',MSGLEVEL=1,CLASS=A
 //*
-//* JCLIN for RAKF 2.1
+//* JCLIN for RAKF 2.1.1
 //*
 //ASMSEC   EXEC PGM=IFOX00,PARM=(NOOBJ,DECK)                                    
 //SYSLIB   DD  DISP=SHR,DSN=SYS1.MACLIB                                         
