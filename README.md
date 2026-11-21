@@ -1,4 +1,4 @@
-# RAKF Version 2 Release 1 Modification 0
+# RAKF Version 2 Release 1 Modification 1
 
 A Security System for MVS 3.8j
 
@@ -144,11 +144,11 @@ the file `TEMPLATES/makerakf.sh` which generates the JCL to assemble and link RA
 ### Installing on MVS 3.8j Turnkey 5 (TK5)
 
 For TK5 the GitHub release carries `TK5INST.zip`. MVS 3.8j Turnkey 5 Update 6
-already contains it as data set `USERMOD.TRKF210`, and it is also
+already contains it as data set `USERMOD.TRKF211`, and it is also
 published on www.cbttape.org as file 850.
 
-Unzip it, upload the `trkf210.xmi` file inside to MVS and RECEIVE it with
-the NJE38 `RECEIVE` command into a PDS named `USERMOD.TRKF210`. Then
+Unzip it, upload the `trkf211.xmi` file inside to MVS and RECEIVE it with
+the NJE38 `RECEIVE` command into a PDS named `USERMOD.TRKF211`. Then
 follow the installation instructions in member `$$$$READ`.
 
 ## Customization
@@ -602,7 +602,7 @@ LISTP: Class=FACILITY Resource=RAKFADM UACC=NONE
        Access list:                                               
        ADMIN    NONE                                              
        RAKFADM  READ                                              
-       STCGROUP READ                                              
+       STCGROUP READ
 LISTP: Class=DATASET  Resource=RAKF.* UACC=NONE 
        Access list:                                               
        ADMIN    ALTER                                             
@@ -1028,6 +1028,13 @@ changed.
 - The module `ICHSEC00` is updated with the new version of RAKF.
 - The HELP members of `ADDUSER`, `ALTUSER` and `DELUSER` are updated.
 - Usermod ZJW0003 is updated to eliminate `SYS1.SECURE.SHADOW`.
+
+
+### RAKF 2.1.1 (21 November 2026)
+
+- TSO command RDEFINE is removed from ADDSD.
+- New TSO command RDEFINE.
+- Sample CNVUSERS added.
 
 ## Appendix A - Generating your own release
 
