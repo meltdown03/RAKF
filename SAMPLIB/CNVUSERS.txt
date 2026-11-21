@@ -1,0 +1,276 @@
+CNVUSERS TITLE 'Add RAKF users with encrypted passwords'                00000101
+*---------------------------------------------------------------------* 00000201
+*                                                                     * 00000301
+*        Module:       CNVUSERS                                       * 00000401
+*                                                                     * 00000501
+*        Author:       Rob Prins                                      * 00000601
+*                                                                     * 00000701
+*        Attributes:   NORENT, NOREUS.                                * 00000801
+*                                                                     * 00000901
+*        Function:     Convert a RAKF 1.2.0 or RAKF 1.2.6 USERS       * 00001001
+*                      member to a RAKF 2.1.0 Users member            * 00001101
+*                      GETMAIN room for 1300 users.                   * 00001201
+*                      Read the RAKF 1.2.x Users member and place     * 00001301
+*                      the contents of the 1.2.x member in this       * 00001401
+*                      table.                                         * 00001501
+*                      Pickup the password of these records and       * 00001601
+*                      call RAKFPWH to hash the password to           * 00001701
+*                      sha256(salt||output) and place this 40 byte    * 00001801
+*                      field in column 32 of the USERS record in the  * 00001901
+*                      table. Add the SPECIAL attribute for HERC01    * 00002001
+*                      and the record types (1 or 2) for all records, * 00002101
+*                      write the table back in SYS1.SECURE.CNTL(USERS)* 00002201
+*                                                                     * 00002301
+*        Note:         The USERS member contains 2 record types:      * 00002401
+*                      Record type 1 contains the UserId, record type,* 00002501
+*                      Group, DFLTGRP star or blank, OPERATIONS (Y/N),* 00002601
+*                      SPECIAL (Y/N), salt and hashed password.       * 00002701
+*                      Record type 2, contains UserId. record type,   * 00002801
+*                      Group and DFLTGRP star or blank.               * 00002901
+*                                                                     * 00003001
+*        FMID          TRKF211                                        * 00003101
+*                                                                     * 00003201
+*        Subroutines:  RAKFPWH                                        * 00003301
+*                      RAKFHASH                                       * 00003401
+*                                                                     * 00003501
+*        Return codes: 00 - all good.                                 * 00003601
+*                      08 - an error occurred, user is notified       * 00003701
+*                           with a message                            * 00003801
+*                                                                     * 00003901
+*---------------------------------------------------------------------* 00004001
+CNVUSERS CSECT                                                          00004101
+         SAVE  (14,12),,*                                               00004201
+         LR    R12,R15                                                  00004301
+         USING CNVUSERS,R12            Base register                    00004401
+         LR    R2,R1                   Save parm (CPPL)                 00004501
+         LA    R1,SAVEAREA             Obtain savearea                  00004601
+         ST    R1,8(,R13)              Forward pointer                  00004701
+         ST    R13,4(,R1)              Backward pointer                 00004801
+         LR    R13,R1                  This is our save area            00004901
+         XC    OLDUSER,OLDUSER                                          00005001
+         GETMAIN RU,LV=104000      GETMAIN room for 1300 user records   00005101
+         ST    R1,ADRUSER              Save its address                 00005201
+*---------------------------------------------------------------------* 00005301
+*        Open SYS1.SECURE.CNTL(USERS) with DDNAME RAKUSER             * 00005401
+*---------------------------------------------------------------------* 00005501
+         OPEN  RAKFUSER                                                 00005601
+*---------------------------------------------------------------------* 00005701
+*        Read the USERS records and check if UserID is already        * 00005801
+*        added.                                                       * 00005901
+*        And populate the table with User records.                    * 00006001
+*---------------------------------------------------------------------* 00006101
+         XR    R5,R5                   Clear record counter             00006201
+         L     R6,ADRUSER              Start of user table              00006301
+CONV009  DS    0H                                                       00006401
+         GET   RAKFUSER                Read a record                    00006501
+         CLI   0(R1),C'*'              Comment record?                  00006601
+         BE    CONV009                 Skip the record                  00006701
+         USING USERREC,R1                                               00006801
+         LA    R5,1(,R5)               Count record                     00006901
+         C     R5,=F'1295'             Already 1295 records in table?   00007001
+         BL    CONV010                 No: room enough                  00007101
+         WTO   'Too many USERS records',ROUTCDE=(2,11)                  00007201
+         BAL   R14,CLOSE               Close RAKFUSER                   00007301
+         B     RC08                    Return code 8                    00007401
+CONV010  DS    0H                                                       00007501
+         CLI   USER#,C' '              Is record converted?             00007601
+         BE    CONV011                 No: process                      00007701
+         WTO   'USERS member already converted',ROUTCDE=(2,11)          00007801
+         BAL   R14,CLOSE               Close RAKFUSER                   00007901
+         B     RC08                    Return code 8                    00008001
+CONV011  MVC   0(80,R6),0(R1)          Record into table                00008101
+         LA    R6,80(,R6)              Next entry in table              00008201
+         B     CONV009                 Read next record                 00008301
+         DROP  R1                                                       00008401
+USEREOF  DS    0H                      EOF RACFUSER                     00008501
+*---------------------------------------------------------------------* 00008601
+*        Sort the USERS records alphabetically                        * 00008701
+*---------------------------------------------------------------------* 00008801
+SORT     STM   R4,R8,SAVESORT                                           00008901
+         LR    R7,R5                   Copy record counter              00009001
+         L     R2,ADRUSER              Point to first entry in table    00009101
+         CH    R7,=H'2'                Less than 2 records?             00009201
+         BL    ENDSORT                 Do not sort                      00009301
+         BCTR  R7,0                    Minus 1                          00009401
+         MH    R7,=H'80'               ** Record length                 00009501
+         LA    R7,0(R2,R7)             Point to last record             00009601
+*                                                                       00009701
+SORT01   DS    0H                      Start sort                       00009801
+         ST    R7,SWAPLAST             Last record swapped              00009901
+         L     R4,ADRUSER              Point to first entry in table    00010001
+         LR    R5,R4                   Next                             00010101
+         LA    R5,80(,R4)                   Record                      00010201
+SORT03   DS    0H                                                       00010301
+         CL    R4,SWAPLAST             Last record reached?             00010401
+         BNL   SORT07                  Yes: loop complete               00010501
+         CLC   0(72,R4),0(R5)          Compare (skip sequence numbers)  00010601
+         BNH   SORT05                  High: swap these records         00010701
+         XC    0(80,R4),0(R5)          Swap                             00010801
+         XC    0(80,R5),0(R4)              the                          00010901
+         XC    0(80,R4),0(R5)                   records                 00011001
+         LR    R7,R4                   Last record swapped in R7        00011101
+SORT05   DS    0H                      Load next entry                  00011201
+         LA    R4,80(,R4)              Next recodd                      00011301
+         LA    R5,80(,R5)              Next record                      00011401
+         B     SORT03                  Compare next record              00011501
+SORT07   DS    0H                      All records done                 00011601
+         CL    R7,SWAPLAST             Are these swaps executed?        00011701
+         BL    SORT01                  No: sort them again              00011801
+*                                      Else end of sort                 00011901
+ENDSORT  LM    R4,R8,SAVESORT          Restore registers                00012001
+*---------------------------------------------------------------------* 00012101
+*        Convert the records                                          * 00012201
+*---------------------------------------------------------------------* 00012301
+         L     R6,ADRUSER              Point to start of table          00012401
+         USING USERREC,R6                                               00012501
+         LR    R7,R5                   # records in table               00012601
+CONV012  CLC   USERUID,OLDUSER         Record of same user?             00012701
+         BE    CONV016                 Yes: do not add hashed password  00012801
+         MVC   OLDUSER,USERUID         Move for next compare            00012901
+*---------------------------------------------------------------------* 00013001
+*        Initialize the Salt with the TOD clock and call RAKFPWH      * 00013101
+*---------------------------------------------------------------------* 00013201
+         MVC   WORKPASS+1(8),USERPWD                                    00013301
+         LA    R3,WORKPASS+1           Start                            00013401
+         LA    R1,WORKPASS+9           end                              00013501
+         TRT   WORKPASS+1(8),TRTAB     Stop at first blank              00013601
+         SR    R1,R3                   Length                           00013701
+         STC   R1,WORKPASS             and save                         00013801
+         STCK  SALT                    Salt = the TOD clock             00013901
+         LA    R0,SALT                 Salt                             00014001
+         ST    R0,HWPL+0               In parmlist                      00014101
+         LA    R0,WORKPASS+1                                            00014201
+         ST    R0,HWPL+4               In parmlist                      00014301
+         XR    R1,R1                   Clear register                   00014401
+         IC    R1,WORKPASS             Gotten password length           00014501
+         ST    R1,HWPWLEN              Save in RAKFPWH list             00014601
+         LA    R0,HWPWLEN                                               00014701
+         ST    R0,HWPL+8               In parmlist                      00014801
+         LA    R0,OUTPUT               Output field                     00014901
+         ST    R0,HWPL+12              In parmlist                      00015001
+         LA    R0,HWWORK               Work area                        00015101
+         ST    R0,HWPL+16              In parmlist                      00015201
+         LA    R1,HWPL                 Parmlist                         00015301
+         ST    R13,HWR13               Save our area address            00015401
+         LR    R4,R13                  Save our area address            00015501
+         LA    R13,HWSAVE                                               00015601
+         L     R15,=V(RAKFPWH)         Hashing routine                  00015701
+         BALR  R14,R15                 Encrypt                          00015801
+         LR    R13,R4                  Restore our area address         00015901
+*---------------------------------------------------------------------* 00016001
+*        Add the salt + hashed password in USERS record type 1.       * 00016101
+*---------------------------------------------------------------------* 00016201
+         MVC   USERSALT,SALT           Salt                             00016301
+         MVC   USERHASH,OUTPUT         Hash                             00016401
+         MVC   USERPWD,=CL8' '         Blank clear password             00016501
+         MVI   USER#,C'1'              Record type 1                    00016601
+         MVI   USERSPE,C'N'            Default NOSPECIAL                00016701
+         CLC   =C'A0611',USERUID       User = A0611 (Rob Prins)         00016801
+         BNE   *+8                     No: process next record          00016901
+         MVI   USERSPE,C'Y'            HERC01 is SPECIAL                00017001
+         CLC   =C'HERC01',USERUID      User = HERC01?                   00017101
+         BNE   *+8                     No: process next record          00017201
+         MVI   USERSPE,C'Y'            HERC01 is SPECIAL                00017301
+         CLC   =C'HERCEL',USERUID      User = HERCEL?                   00017401
+         BNE   *+8                     No: process next record          00017501
+         MVI   USERSPE,C'Y'            HERCEL is SPECIAL                00017601
+         LA    R6,80(,R6)              Next entry in table              00017701
+         BCT   R7,CONV012              Process next record              00017801
+         B     CONV018                                                  00017901
+CONV016  DS    0H                                                       00018001
+         MVI   USER#,C'2'              Record type 2                    00018101
+         MVC   USERPWD,=CL8' '         Blank clear password             00018201
+         MVI   USERSPE,C' '            Blank SPECIAL authority          00018301
+         MVI   USEROPR,C' '            Blank OPERATIONS authority       00018401
+         LA    R6,80(,R6)              Next entry in table              00018501
+         BCT   R7,CONV012              Process next record              00018601
+CONV018  BAL   R14,CLOSE               Close RAKFUSER                   00018701
+         OPEN  (RAKFUSER,(OUTPUT))                                      00018801
+         L     R6,ADRUSER              Point to start of table          00018901
+CONV021  PUT   RAKFUSER,0(R6)          Write ...                        00019001
+         LA    R6,80(,R6)                    User ...                   00019101
+         BCT   R5,CONV021                         table back            00019201
+         WTO   'USERS member succesfully converted',ROUTCDE=(2,11)      00019301
+         LA    R15,0                   RC = 0                           00019401
+         B     RETURN                                                   00019501
+*---------------------------------------------------------------------* 00019601
+*        Return                                                       * 00019701
+*---------------------------------------------------------------------* 00019801
+RC08     DS    0H                                                       00019901
+         LA    R15,8                   RC = 8                           00020001
+RETURN   DS    0H                                                       00020101
+         LR    R4,R15                  Save return code                 00020201
+RETURN2  L     R2,ADRUSER              Point to USER core table         00020301
+         FREEMAIN RU,LV=104000,A=(2)                                    00020401
+         LR    R3,R13                  Load working storage to free     00020501
+         L     R13,4(,R13)             Load caller's save area          00020601
+         LR    R15,R4                  Restore return code              00020701
+         RETURN (14,12),RC=(15)        Return                           00020801
+*                                                                       00020901
+         TITLE 'Close RAKFUSER'                                         00021001
+CLOSE    ST    R14,R14CLOSE            Save register 14                 00021101
+         CLOSE RAKFUSER                                                 00021201
+         L     R14,R14CLOSE            Restore register 14              00021301
+         BR    R14                     Return                           00021401
+         TITLE 'CONSTANTS'                                              00021501
+RAKFUSER DCB   DSORG=PS,LRECL=80,DDNAME=RAKFUSER,EODAD=USEREOF,        *00021601
+               MACRF=(GL,PM)                                            00021701
+         LTORG ,                                                        00021801
+SAVEAREA DS    18F                     Our save area                    00021901
+R14CLOSE DS    F                       Register 14 CLOSE                00022001
+ADRUSER  DS    F                       Address of 1300 user entries     00022101
+SWAPLAST DS    F                       Workfield SORT                   00022201
+SAVESORT DS    5F                      Workfields SORT                  00022301
+SALT     DS    CL8                     SALT is equal to TOD clock       00022401
+OUTPUT   DS    CL32                    Hashed output field              00022501
+USERID   DS    CL8                     To receive UserID                00022601
+*                                                                       00022701
+HASHWKD  DS    0CL772                  Area for RAKFPWH                 00022801
+HWPL     DS    5F                    parmlist (salt,pw,pwlen,out,work)  00022901
+HWPWLEN  DS    F                       Candidate password length        00023001
+HWR13    DS    F                       saved caller save-area pointer   00023101
+HWOUT    DS    CL32                    computed SHA-256 hash            00023201
+HWSAVE   DS    18F                     save area for the RAKFPWH call   00023301
+HWWORK   DS    CL640                   RAKFPWH work area (>= RPWWORKL)  00023401
+*                                                                       00023501
+WORKPASS DS    CL9                     1 byte length + password         00023601
+*                                                                       00023701
+OLDUSER  DS    CL8                                                      00023801
+TRTAB    DC    256X'00'                Translate table to stop          00023901
+         ORG   TRTAB+X'40'             at the blank                     00024001
+         DC    X'FF'                                                    00024101
+         ORG   ,                                                        00024201
+*                                                                       00024301
+R0       EQU   0                                                        00024401
+R1       EQU   1                                                        00024501
+R2       EQU   2                                                        00024601
+R3       EQU   3                                                        00024701
+R4       EQU   4                                                        00024801
+R5       EQU   5                       Counter number of USER records   00024901
+R6       EQU   6                       Address of USER entry in table   00025001
+R7       EQU   7                                                        00025101
+R8       EQU   8                       Address of IKJPARS PDL           00025201
+R9       EQU   9                                                        00025301
+R10      EQU   10                                                       00025401
+R11      EQU   11                                                       00025501
+R12      EQU   12                      Base register                    00025601
+R13      EQU   13                      Address of working storage       00025701
+R14      EQU   14                                                       00025801
+R15      EQU   15                                                       00025901
+*                                                                       00026001
+USERREC  DSECT                         User record                      00026101
+USERTYP  DS    0CL9                    UserId + record type (1 or 2)    00026201
+USERUID  DS    CL8                     Contains UserID                  00026301
+USER#    DS    C                       Contains 1 or 2                  00026401
+*                                      1 = user record 2 = connected    00026501
+USERGRP  DS    CL8                     Group                            00026601
+USERDFT  DS    C                       Is a star if this is DFLTGRP     00026701
+USERPWD  DS    CL8                     Password is blanked after        00026801
+         DS    C                                                        00026901
+USEROPR  DS    C             Operations / Nooperations (if USER# = 1)   00027001
+         DS    C                                                        00027101
+USERSPE  DS    C             Special / Nospecial (only if USER# =1)     00027201
+         DS    C                                                        00027301
+USERSALT DS    CL8                     Salt (only if USER# = 1)         00027401
+USERHASH DS    CL32                 Hashed password (only if USER# = 1) 00027501
+         END                                                            00027601

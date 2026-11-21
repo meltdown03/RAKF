@@ -91,7 +91,7 @@ class Module:
     sources: list       # SRCLIB member names, in link order
     asm_steps: list     # ASM step name for each source (parallel to sources)
     entry: str          # ENTRY linker directive
-    target: str         # destination PDS (SYS1.LINKLIB or SYS1.LPALIB)
+    target: str         # destination PDS (SYS1.LINKLIB, SYS1.CMDLIB or SYS1.LPALIB)
     link_parm: str      # IEWL PARM= string
     aliases: list = dc_field(default_factory=list)  # ALIAS linker directives
 
@@ -117,7 +117,9 @@ MODULES = [
             aliases=["LU"]),
     Module("CONNECT",  ["CONNECT"],                        ["ASMCON"], "CONNECT", "SYS1.CMDLIB",  "MAP,LIST,LET,NCAL,RENT,REUS"),
     Module("ADDSD",    ["ADDSD"],                          ["ASMADSD"], "ADDSD",  "SYS1.CMDLIB",  "MAP,LIST,LET,NCAL,RENT,REUS",
-            aliases=["AD", "RDEFINE"]),
+            aliases=["AD"]),
+    Module("RDEFINE",  ["RDEFINE"],                        ["ASMRDEF"], "RDEFINE",  "SYS1.CMDLIB",  "MAP,LIST,LET,NCAL,RENT,REUS",
+            aliases=["RDEF"]),
     Module("PERMIT",   ["PERMIT"],                         ["ASMPERM"], "PERMIT", "SYS1.CMDLIB",  "MAP,LIST,LET,NCAL,RENT,REUS",
             aliases=["PE"]),
     Module("RDELETE",   ["RDELETE"],                       ["ASMRDEL"], "RDELETE", "SYS1.CMDLIB",  "MAP,LIST,LET,NCAL,RENT,REUS"),

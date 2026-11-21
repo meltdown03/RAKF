@@ -5,12 +5,12 @@
 //             REGION=8192K,
 //             MSGLEVEL=(1,1)
 //* *******************************************************************
-//* Installs RAKF 2.1.0
+//* Installs RAKF 2.1.1
 //*
 //* This JCL was generated from makesmp.sh
 //*
 //* ------------------------------------------------------------------*
-//* Prepare system for RAKF 2.1.0 installation                        *
+//* Prepare system for RAKF 2.1.1 installation                        *
 //*                                                                   *
 //* Expected return codes: Step UCLIN:  00                            *
 //*                        Step LIBS:   00                            *
@@ -92,13 +92,13 @@
 //* ------------------------------------------------------------------*
 //RECEIVER EXEC SMPREC
 //SMPPTFIN DD DATA,DLM='??'
-++FUNCTION(TRKF210).
-++VER(Z038) DELETE(TRKF120,TRKF126,TRKF200) 
+++FUNCTION(TRKF211).
+++VER(Z038) DELETE(TRKF120,TRKF126,TRKF200,TRKF210) 
             SUP(RRKF006,RRKF007,RRKF008,RRKF009)
   /*                                                             
 
   PROBLEM DESCRIPTON:                                                          
-      Install RAKF version 2.1:                                                 
+      Install RAKF version 2.1.1:                                                 
       This version contains many improvements comparing                         
       with RAKF 1.2.0.                                                          
       1: No plain passwords will be stored                                      

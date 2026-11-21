@@ -48,6 +48,7 @@
   DEL LMOD(LISTUSER) .                                                  00004801
   DEL LMOD(CONNECT)  .                                                  00004901
   DEL LMOD(ADDSD)    .                                                  00005001
+  DEL LMOD(RDEFINE)  .                                                  00005011
   DEL LMOD(PERMIT)   .                                                  00005103
   DEL LMOD(RDELETE)  .                                                  00005203
   DEL LMOD(LISTP)    .                                                  00005301
@@ -71,6 +72,7 @@
   DEL  MOD(LISTUSER) .                                                  00007101
   DEL  MOD(CONNECT)  .                                                  00007201
   DEL  MOD(ADDSD)    .                                                  00007301
+  DEL  MOD(RDEFINE)  .                                                  00007312
   DEL  MOD(PERMIT)   .                                                  00007403
   DEL  MOD(RDELETE)  .                                                  00007503
   DEL  MOD(LISTP)    .                                                  00007601
@@ -87,6 +89,7 @@
   DEL  SRC(LISTUSER) .                                                  00008701
   DEL  SRC(CONNECT)  .                                                  00008801
   DEL  SRC(ADDSD)    .                                                  00008901
+  DEL  SRC(RDEFINE)  .                                                  00008911
   DEL  SRC(PERMIT)   .                                                  00009003
   DEL  SRC(RDELETE)  .                                                  00009103
   DEL  SRC(LISTP)    .                                                  00009201
@@ -102,6 +105,7 @@
   DEL  MAC($$COPYRT) .                                                  00010200
   DEL  MAC($$NOTICE) .                                                  00010300
   DEL  MAC($DOC$ZIP) .                                                  00010400
+  DEL  MAC(CNVUSERS) .                                                  00010410
   DEL  MAC(LPABACK)  .                                                  00010500
   DEL  MAC(LPAREST)  .                                                  00010600
   DEL  MAC(JRACIND)  .                                                  00010700
@@ -146,6 +150,7 @@
   DEL  SRC(LISTUSER) .                                                  00014601
   DEL  SRC(CONNECT)  .                                                  00014701
   DEL  SRC(ADDSD)    .                                                  00014801
+  DEL  SRC(RDEFINE)  .                                                  00014811
   DEL  SRC(PERMIT)   .                                                  00014903
   DEL  SRC(RDELETE)  .                                                  00015003
   DEL  SRC(LISTP)    .                                                  00015101
@@ -160,6 +165,7 @@
   DEL  MAC($$$$INFO) .                                                  00016000
   DEL  MAC($$COPYRT) .                                                  00016100
   DEL  MAC($$NOTICE) .                                                  00016200
+  DEL  MAC(CNVUSERS) .                                                  00016210
   DEL  MAC($DOC$ZIP) .                                                  00016300
   DEL  MAC(LPABACK)  .                                                  00016400
   DEL  MAC(LPAREST)  .                                                  00016500
@@ -224,6 +230,7 @@
    SCRATCH VOL=tttt=rrrrrr,DSNAME=SYS1.CMDLIB,MEMBER=ADDSD              00022401
    SCRATCH VOL=tttt=rrrrrr,DSNAME=SYS1.CMDLIB,MEMBER=AD                 00022501
    SCRATCH VOL=tttt=rrrrrr,DSNAME=SYS1.CMDLIB,MEMBER=RDEFINE            00022601
+   SCRATCH VOL=tttt=rrrrrr,DSNAME=SYS1.CMDLIB,MEMBER=RDEF               00022611
    SCRATCH VOL=tttt=rrrrrr,DSNAME=SYS1.CMDLIB,MEMBER=PERMIT             00022701
    SCRATCH VOL=tttt=rrrrrr,DSNAME=SYS1.CMDLIB,MEMBER=PE                 00022801
    SCRATCH VOL=tttt=rrrrrr,DSNAME=SYS1.CMDLIB,MEMBER=RDELETE            00022901

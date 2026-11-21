@@ -229,8 +229,8 @@ def emit_header(filename):
             last_control = stripped
 
 
-def emit_trkf210_jclin(filename):
-    """Emit TRKF210 JCLIN after verifying the V2 password-hash linkage."""
+def emit_trkf211_jclin(filename):
+    """Emit TRKF211 JCLIN after verifying the V2 password-hash linkage."""
     with open(filename) as f:
         text = f.read().rstrip()
 
@@ -240,7 +240,7 @@ def emit_trkf210_jclin(filename):
     required = ('INCLUDE SYSPUNCH(RAKFHASH)', 'INCLUDE SYSPUNCH(RAKFPWH)')
     missing = [item for item in required if item not in text]
     if missing:
-        sys.exit('generate_release.py: JCLIN/TRKF210.jcl is missing: {}'
+        sys.exit('generate_release.py: JCLIN/TRKF211.jcl is missing: {}'
                  .format(', '.join(missing)))
 
     emit_text(text)
@@ -530,7 +530,7 @@ if args.users_recovery:
 ##################################################
 
 emit_header(running_folder + "/TEMPLATES/01_header.template")
-emit_trkf210_jclin(running_folder + "/JCLIN/TRKF210.jcl")
+emit_trkf211_jclin(running_folder + "/JCLIN/TRKF211.jcl")
 
 smp_dict = {
         'MACLIB': "++MAC({}) DISTLIB(AMACLIB)  SYSLIB(MACLIB).",

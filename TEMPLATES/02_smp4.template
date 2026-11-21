@@ -1,13 +1,13 @@
 ??
 /*
 //SMPCNTL  DD  *
- /* REJECT SELECT(TRKF210) . */
+ /* REJECT SELECT(TRKF211) . */
  RESETRC.
- RECEIVE SELECT(TRKF210) .
+ RECEIVE SELECT(TRKF211) .
 /*
 //*
 //* ------------------------------------------------------------------*
-//* SMP apply of RAKF 2.1.0                                           *
+//* SMP apply of RAKF 2.1.1                                           *
 //* Expected APPLY step return code: 04 or lower                      *
 //*                                   |                               *
 //*                                    --> resulting from RC=8 in SMP *
@@ -28,10 +28,10 @@
 //SAMPLIB  DD  DISP=SHR,DSN=RAKF.SAMPLIB
 //SRCLIB   DD  DISP=SHR,DSN=RAKF.SRCLIB
 //SMPCNTL  DD  *
- APPLY S(TRKF210) DIS(WRITE) .
+ APPLY S(TRKF211) DIS(WRITE) .
 /*
 //* ------------------------------------------------------------------*
-//* SMP accept of RAKF 2.1.0                                          *
+//* SMP accept of RAKF 2.1.1                                          *
 //* Expected return code: 00                                          *
 //* ------------------------------------------------------------------*
 //ACCEPTR EXEC SMPAPP
@@ -47,5 +47,5 @@
 //ASRCLIB  DD  DISP=SHR,DSN=RAKF.ASRCLIB
 //SRCLIB   DD  DISP=SHR,DSN=RAKF.SRCLIB
 //SMPCNTL  DD  *
- ACCEPT S(TRKF210) DIS(WRITE) .
+ ACCEPT S(TRKF211) DIS(WRITE) .
 /*
