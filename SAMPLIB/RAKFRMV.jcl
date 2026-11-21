@@ -105,6 +105,7 @@
   DEL  MAC($$COPYRT) .                                                  00010200
   DEL  MAC($$NOTICE) .                                                  00010300
   DEL  MAC($DOC$ZIP) .                                                  00010400
+  DEL  MAC(CNVUSERS) .                                                  00010410
   DEL  MAC(LPABACK)  .                                                  00010500
   DEL  MAC(LPAREST)  .                                                  00010600
   DEL  MAC(JRACIND)  .                                                  00010700
@@ -164,6 +165,7 @@
   DEL  MAC($$$$INFO) .                                                  00016000
   DEL  MAC($$COPYRT) .                                                  00016100
   DEL  MAC($$NOTICE) .                                                  00016200
+  DEL  MAC(CNVUSERS) .                                                  00016210
   DEL  MAC($DOC$ZIP) .                                                  00016300
   DEL  MAC(LPABACK)  .                                                  00016400
   DEL  MAC(LPAREST)  .                                                  00016500
