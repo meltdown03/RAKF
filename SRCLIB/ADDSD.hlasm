@@ -430,7 +430,7 @@ MSGA     DC    C'ADDSD: Run RAKFPROF to activate the changes'           00042900
 MSGY     DC    C'ADDSD: No ACEE found'                                  00043000
 MSGZ     DC    C'ADDSD: Not authorized, no SPECIAL attribute'           00043100
 MSG3X    DC    C'ADDSD: xxxxxxxx access denied'  +7                     00043200
-MSG9X    DS    0CL79                                                    00043300
+MSG9X    DS    0CL77                                                    00043300
          DC    CL7'ADDSD: '                                             00043400
          DC    CL8' '                                                   00043500
          DC    CL18' profile defined: '                                 00043600
